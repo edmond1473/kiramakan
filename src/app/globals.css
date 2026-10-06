@@ -1,0 +1,179 @@
+@import "tailwindcss";
+
+/* Apple 风格 token：组件只用语义变量，深色模式自动切换 */
+:root {
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --surface-2: #f2f2f7;
+  --label: #1d1d1f;
+  --label-2: #6e6e73;
+  --label-3: #86868b;
+  --separator: #d2d2d7;
+  --fill: rgba(120, 120, 128, 0.12);
+  --fill-2: rgba(120, 120, 128, 0.18);
+  --tint: #0071e3;
+  --tint-fill: #0071e3;
+  --tint-text: #0066cc;
+  --tint-soft: rgba(0, 113, 227, 0.12);
+  --red: #ff3b30;
+  --orange: #ff9500;
+  --green: #34c759;
+  --red-text: #b42318;
+  --orange-text: #9c4600;
+  --green-text: #15703a;
+  --shadow-pop: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 8px 28px rgba(0, 0, 0, 0.12);
+  --shadow-sheet: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 24px 64px rgba(0, 0, 0, 0.18);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000;
+    --surface: #1c1c1e;
+    --surface-2: #2c2c2e;
+    --label: #f5f5f7;
+    --label-2: #a1a1a6;
+    --label-3: #6e6e73;
+    --separator: #38383a;
+    --fill: rgba(118, 118, 128, 0.24);
+    --fill-2: rgba(118, 118, 128, 0.32);
+    --tint: #0a84ff;
+    --tint-fill: #0071e3;
+    --tint-text: #2997ff;
+    --tint-soft: rgba(10, 132, 255, 0.18);
+    --red: #ff453a;
+    --orange: #ff9f0a;
+    --green: #30d158;
+    --red-text: #ff6961;
+    --orange-text: #ffb340;
+    --green-text: #30d158;
+    --shadow-pop: 0 0 0 0.5px rgba(255, 255, 255, 0.1), 0 8px 28px rgba(0, 0, 0, 0.5);
+    --shadow-sheet: 0 0 0 0.5px rgba(255, 255, 255, 0.1), 0 24px 64px rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-label: var(--label);
+  --color-label-2: var(--label-2);
+  --color-label-3: var(--label-3);
+  --color-separator: var(--separator);
+  --color-fill: var(--fill);
+  --color-fill-2: var(--fill-2);
+  --color-tint: var(--tint);
+  --color-tint-fill: var(--tint-fill);
+  --color-tint-text: var(--tint-text);
+  --color-tint-soft: var(--tint-soft);
+  --color-red: var(--red);
+  --color-orange: var(--orange);
+  --color-green: var(--green);
+  --color-red-text: var(--red-text);
+  --color-orange-text: var(--orange-text);
+  --color-green-text: var(--green-text);
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--bg);
+  color: var(--label);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 22px;
+}
+
+:lang(zh) {
+  letter-spacing: 0;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--tint);
+  outline-offset: 2px;
+}
+
+/* 底部 sheet 动画 */
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.sheet-in {
+  animation: sheet-in 340ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.fade-in {
+  animation: fade-in 200ms ease-out;
+}
+
+/* 浮在内容上的工具栏用玻璃；不支持就用实色 */
+.material {
+  background: var(--surface);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .material {
+    background: color-mix(in srgb, var(--surface) 78%, transparent);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
+    backdrop-filter: blur(24px) saturate(150%);
+  }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .material {
+    background: var(--surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-in,
+  .fade-in {
+    animation: none;
+  }
+}
+
+.press:active {
+  transform: scale(0.97);
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* 分组列表：分隔线从文字开始处画，最后一行不画 */
+.list > .row:last-child > .row-sep,
+.list > .row:last-child .row-sep {
+  border-bottom-width: 0;
+}
+
+/* 底部安全区（iPhone home indicator） */
+.pb-safe {
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+.bottom-safe {
+  bottom: 0;
+  padding-bottom: env(safe-area-inset-bottom);
+}
