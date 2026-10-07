@@ -7,7 +7,7 @@ import { api } from "@/lib/client/api";
 import { formatRM } from "@/lib/money";
 import { isSettled, type BillPayStatus } from "@/lib/ledger";
 import { PaymentSheet } from "@/components/PaymentSheet";
-import { Button, Group, Money, PageHeader, Row, StatusChip, formatDate } from "@/components/ui";
+import { BigMoney, Button, Group, Money, PageHeader, Row, StatusChip, Tag, buttonClass, cx, formatDate } from "@/components/ui";
 import { CopyButton, Field, Sheet, toast, useOrigin } from "@/components/ui-client";
 
 interface ChargeV {
@@ -85,71 +85,72 @@ export function PersonDetail({
         back={{ href: "/people", label: "朋友" }}
         subtitle={person.tngName ? `TNG：${person.tngName}` : undefined}
         action={
-          <button
-            aria-label="修改资料"
-            onClick={() => setEditOpen(true)}
-            className="flex size-9 items-center justify-center rounded-lg text-tint-text active:bg-fill"
-          >
-            <Pencil className="size-5" strokeWidth={1.75} />
-          </button>
+          <Button size="sm" aria-label="修改资料" onClick={() => setEditOpen(true)}>
+            <Pencil className="size-3.5" strokeWidth={2.5} /> 修改
+          </Button>
         }
       />
       <div className="px-4">
-        <section className="mt-4 rounded-xl bg-surface p-4">
-          {theyOwe > 0 && !isSettled(theyOwe) ? (
-            <>
-              <p className="text-[15px] leading-5 text-label-2">欠你</p>
-              <p className="tabular mt-1 text-[34px] leading-[40px] font-bold tracking-[-0.01em]">{formatRM(theyOwe)}</p>
-              <p className="mt-1 text-[13px] leading-[18px] text-label-2">
-                {openTo.length} 餐还没还清
-                {openTo.some((c) => c.status === "forgot_tax") && <span className="text-orange-text"> · 有忘了给 tax</span>}
-              </p>
-            </>
-          ) : toMe.balance < 0 && !isSettled(toMe.balance) ? (
-            <p className="text-[15px]">
-              多给了你 <Money cents={-toMe.balance} className="font-semibold" />，下次会自动扣。
-            </p>
-          ) : (
-            <p className="text-[17px] leading-6 font-semibold">没有欠你 ✓</p>
-          )}
-          {iOwe > 0 && !isSettled(iOwe) && (
-            <p className="mt-3 border-t border-separator pt-3 text-[14px] leading-5">
-              你欠 {person.name} <Money cents={iOwe} className="font-semibold" />
-            </p>
-          )}
-          <div className="mt-4 grid gap-2">
-            {theyOwe > 0 && (
-              <Button variant="filled" full onClick={() => setPayOpen("in")}>
-                记录 {person.name} 付的钱
-              </Button>
-            )}
-            {canOffset && (
-              <Button variant="tinted" full onClick={offset}>
-                <ArrowLeftRight className="size-4" strokeWidth={2} /> 互抵 {formatRM(Math.min(theyOwe, iOwe))}
-              </Button>
-            )}
-            {iOwe > 0 && (
-              <Button full onClick={() => setPayOpen("out")}>
-                记录我付给 {person.name}
-              </Button>
-            )}
-          </div>
-        </section>
+        {(() => {
+          const owesMe = theyOwe > 0 && !isSettled(theyOwe);
+          return (
+            <section className={cx("card mt-6 rounded-[32px] p-5", owesMe ? "grid-lines on-color" : "bg-surface")}>
+              {owesMe ? (
+                <>
+                  <p className="label-mono">欠你</p>
+                  <BigMoney cents={theyOwe} className="mt-3 text-[56px] leading-[0.88]" />
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <span className="text-[14px] leading-5">{openTo.length} 餐还没还清</span>
+                    {openTo.some((c) => c.status === "forgot_tax") && <Tag tone="flare">有忘了给 tax</Tag>}
+                  </div>
+                </>
+              ) : toMe.balance < 0 && !isSettled(toMe.balance) ? (
+                <p className="text-[16px] leading-6">
+                  多给了你 <Money cents={-toMe.balance} className="font-semibold" />，下次会自动扣。
+                </p>
+              ) : (
+                <p className="display text-[30px]">没有欠你 ✓</p>
+              )}
+              {iOwe > 0 && !isSettled(iOwe) && (
+                <p className={cx("mt-4 border-t pt-3.5 text-[15px] leading-5", owesMe ? "border-ink/15" : "border-separator")}>
+                  你欠 {person.name} <Money cents={iOwe} className="font-semibold" />
+                </p>
+              )}
+              <div className="mt-5 grid gap-2">
+                {theyOwe > 0 && (
+                  <Button variant="filled" size="lg" full onClick={() => setPayOpen("in")}>
+                    记录 {person.name} 付的钱
+                  </Button>
+                )}
+                {canOffset && (
+                  <Button variant={owesMe ? "ink" : "tinted"} full onClick={offset}>
+                    <ArrowLeftRight className="size-4" strokeWidth={2.25} /> 互抵 {formatRM(Math.min(theyOwe, iOwe))}
+                  </Button>
+                )}
+                {iOwe > 0 && (
+                  <Button variant={owesMe ? "gray-ink" : "gray"} full onClick={() => setPayOpen("out")}>
+                    记录我付给 {person.name}
+                  </Button>
+                )}
+              </div>
+            </section>
+          );
+        })()}
 
         {theyOwe > 0 && (
-          <section className="mt-4 rounded-xl bg-surface p-4">
-            <p className="text-[15px] leading-5 font-semibold">发给 {person.name} 看</p>
-            <p className="mt-1 text-[13px] leading-[18px] text-label-2">他的专属 link：全部欠款、每一餐的明细，还有你的收款 QR。</p>
-            <div className="mt-3 grid grid-cols-2 gap-2">
+          <section className="card mt-4 rounded-[24px] bg-surface p-5">
+            <p className="text-[20px] leading-6 font-semibold tracking-[-0.02em]">发给 {person.name} 看</p>
+            <p className="mt-1.5 text-[14px] leading-5 text-label-2">他的专属 link：全部欠款、每一餐的明细，还有你的收款 QR。</p>
+            <div className="mt-4 grid grid-cols-2 gap-2">
               <a
                 href={`https://wa.me/${person.phone ? waNumber(person.phone) : ""}?text=${encodeURIComponent(waText)}`}
                 target="_blank"
                 rel="noreferrer"
-                className="press inline-flex h-11 items-center justify-center gap-1.5 rounded-[10px] bg-tint-soft px-4 text-[15px] font-semibold text-tint-text"
+                className={buttonClass("tinted", "md", true)}
               >
-                <MessageCircle className="size-[18px]" strokeWidth={2} /> WhatsApp
+                <MessageCircle className="size-[18px]" strokeWidth={2.25} /> WhatsApp
               </a>
-              <CopyButton text={personalUrl} label="复制 link" variant="gray" />
+              <CopyButton text={personalUrl} label="复制 link" variant="gray" full />
             </div>
           </section>
         )}
@@ -178,18 +179,18 @@ export function PersonDetail({
                 key={p.id}
                 trailing={
                   <div className="flex items-center gap-1">
-                    <Money cents={p.amountCents} className="text-[15px] font-semibold" />
+                    <Money cents={p.amountCents} className="text-[16px] font-semibold" />
                     <button
                       aria-label="删除这笔付款"
                       onClick={() => deletePayment(p.id)}
-                      className="flex size-8 items-center justify-center rounded-lg text-label-3 active:bg-fill"
+                      className="flex size-10 items-center justify-center rounded-full text-label-3 active:bg-fill"
                     >
-                      <Trash2 className="size-4" strokeWidth={1.75} />
+                      <Trash2 className="size-4" strokeWidth={2} />
                     </button>
                   </div>
                 }
               >
-                <p className="text-[15px] leading-5">{p.incoming ? `${person.name} → 你` : `你 → ${person.name}`}</p>
+                <p className="text-[16px] leading-[21px]">{p.incoming ? `${person.name} → 你` : `你 → ${person.name}`}</p>
                 <p className="mt-0.5 text-[13px] leading-[18px] text-label-2">
                   {formatDate(p.paidAt.slice(0, 10))}
                   {p.source === "offset" && " · 互抵"}
@@ -236,17 +237,15 @@ function ChargeRow({ c }: { c: ChargeV }) {
     <Row
       href={`/bills/${c.billId}`}
       chevron
-      trailing={
-        <div className="flex flex-col items-end">
-          <Money cents={c.owed} className="text-[15px] font-semibold" />
-          <StatusChip status={c.status} remaining={c.remaining} />
-        </div>
-      }
+      trailing={<Money cents={c.owed} className="text-[16px] font-semibold" />}
     >
-      <p className="truncate text-[15px] leading-5 font-semibold">{c.title}</p>
+      <p className="truncate text-[16px] leading-[21px] font-semibold">{c.title}</p>
       <p className="tabular mt-0.5 text-[13px] leading-[18px] text-label-2">
         {formatDate(c.billDate)} · item {formatRM(c.preTax)}
       </p>
+      <div className="mt-1.5">
+        <StatusChip status={c.status} remaining={c.remaining} />
+      </div>
     </Row>
   );
 }
@@ -311,7 +310,7 @@ function EditPersonSheetInner({
         </Button>
       }
     >
-      <div className="space-y-4 pt-2">
+      <div className="space-y-5">
         <Field label="名字" value={name} onChange={(e) => setName(e.target.value)} />
         <Field
           label="TNG 名字"

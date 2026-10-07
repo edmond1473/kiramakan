@@ -1,68 +1,94 @@
 @import "tailwindcss";
 
-/* Apple 风格 token：组件只用语义变量，深色模式自动切换 */
+/*
+ * ManyChat 风格 token
+ * 白底 + 近黑字，整块的亮黄 / 洋红 / 靛蓝 / 深绿当重点；胶囊按钮、大圆角卡片、没有阴影。
+ * 组件只用语义变量，深色模式自动切换。
+ */
 :root {
-  --bg: #f5f5f7;
-  --surface: #ffffff;
-  --surface-2: #f2f2f7;
-  --label: #1d1d1f;
-  --label-2: #6e6e73;
-  --label-3: #86868b;
-  --separator: #d2d2d7;
-  --fill: rgba(120, 120, 128, 0.12);
-  --fill-2: rgba(120, 120, 128, 0.18);
-  --tint: #0071e3;
-  --tint-fill: #0071e3;
-  --tint-text: #0066cc;
-  --tint-soft: rgba(0, 113, 227, 0.12);
-  --red: #ff3b30;
-  --orange: #ff9500;
-  --green: #34c759;
-  --red-text: #b42318;
-  --orange-text: #9c4600;
-  --green-text: #15703a;
-  --shadow-pop: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 8px 28px rgba(0, 0, 0, 0.12);
-  --shadow-sheet: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 24px 64px rgba(0, 0, 0, 0.18);
+  /* 品牌色：深浅色都一样 */
+  --ink: #0f0f0f;
+  --paper: #ffffff;
+  --volt: #fff100;
+  --magenta: #fa0cf7;
+  --indigo: #3b42c4;
+  --forest: #007257;
+  --flare: #ff5c1a;
+
+  --bg: #ffffff;
+  --surface: #f5f5f5;
+  --surface-2: #ebebeb;
+  --field: #f5f5f5; /* 页面上的输入框 */
+  --field-card: #ffffff; /* 卡片里的输入框 */
+  --label: #0f0f0f;
+  --label-2: rgba(15, 15, 15, 0.62);
+  --label-3: rgba(15, 15, 15, 0.4);
+  --separator: rgba(15, 15, 15, 0.1);
+  --fill: rgba(15, 15, 15, 0.06);
+  --fill-2: rgba(15, 15, 15, 0.12);
+  --contrast: #0f0f0f; /* 黑色胶囊按钮 */
+  --on-contrast: #ffffff;
+  --tint: #0f0f0f;
+  --tint-fill: #fa0cf7;
+  --tint-text: #0f0f0f;
+  --tint-soft: #fff100;
+  --red: #ff5c1a;
+  --orange: #fff100;
+  --green: #007257;
+  --red-text: #c63d00;
+  --orange-text: #a34a00;
+  --green-text: #007257;
+  --grid: rgba(15, 15, 15, 0.075);
+  --scrim: rgba(15, 15, 15, 0.45);
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #000000;
-    --surface: #1c1c1e;
-    --surface-2: #2c2c2e;
-    --label: #f5f5f7;
-    --label-2: #a1a1a6;
-    --label-3: #6e6e73;
-    --separator: #38383a;
-    --fill: rgba(118, 118, 128, 0.24);
-    --fill-2: rgba(118, 118, 128, 0.32);
-    --tint: #0a84ff;
-    --tint-fill: #0071e3;
-    --tint-text: #2997ff;
-    --tint-soft: rgba(10, 132, 255, 0.18);
-    --red: #ff453a;
-    --orange: #ff9f0a;
-    --green: #30d158;
-    --red-text: #ff6961;
-    --orange-text: #ffb340;
-    --green-text: #30d158;
-    --shadow-pop: 0 0 0 0.5px rgba(255, 255, 255, 0.1), 0 8px 28px rgba(0, 0, 0, 0.5);
-    --shadow-sheet: 0 0 0 0.5px rgba(255, 255, 255, 0.1), 0 24px 64px rgba(0, 0, 0, 0.6);
+    --bg: #0f0f0f;
+    --surface: #1c1c1c;
+    --surface-2: #2a2a2a;
+    --field: #1c1c1c;
+    --field-card: #2a2a2a;
+    --label: #ffffff;
+    --label-2: rgba(255, 255, 255, 0.64);
+    --label-3: rgba(255, 255, 255, 0.4);
+    --separator: rgba(255, 255, 255, 0.12);
+    --fill: rgba(255, 255, 255, 0.08);
+    --fill-2: rgba(255, 255, 255, 0.14);
+    --contrast: #ffffff;
+    --on-contrast: #0f0f0f;
+    --tint: #ffffff;
+    --tint-text: #ffffff;
+    --tint-soft: rgba(255, 241, 0, 0.16);
+    --red-text: #ff7d4a;
+    --orange-text: #ffc247;
+    --green-text: #3fd49b;
+    --scrim: rgba(0, 0, 0, 0.6);
     color-scheme: dark;
   }
 }
 
 @theme inline {
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-volt: var(--volt);
+  --color-magenta: var(--magenta);
+  --color-indigo: var(--indigo);
+  --color-forest: var(--forest);
+  --color-flare: var(--flare);
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-field: var(--field);
   --color-label: var(--label);
   --color-label-2: var(--label-2);
   --color-label-3: var(--label-3);
   --color-separator: var(--separator);
   --color-fill: var(--fill);
   --color-fill-2: var(--fill-2);
+  --color-contrast: var(--contrast);
+  --color-on-contrast: var(--on-contrast);
   --color-tint: var(--tint);
   --color-tint-fill: var(--tint-fill);
   --color-tint-text: var(--tint-text);
@@ -73,88 +99,182 @@
   --color-red-text: var(--red-text);
   --color-orange-text: var(--orange-text);
   --color-green-text: var(--green-text);
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, "Helvetica Neue",
-    Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  /* 中文：iPhone 用 PingFang，Android 用系统的 Noto Sans CJK；大标题用超粗的 Noto Sans SC（网页字体，只下载用到的字） */
+  --font-sans:
+    "Instrument Sans Variable", "PingFang SC", "Hiragino Sans GB",
+    -apple-system, BlinkMacSystemFont, "Microsoft YaHei", "Noto Sans CJK SC",
+    "Source Han Sans SC", sans-serif;
+  --font-display:
+    "Bricolage Grotesque Variable", "Noto Sans SC", "PingFang SC", sans-serif;
+  --font-mono:
+    "DM Mono", ui-monospace, "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", monospace;
 }
 
-html {
-  -webkit-text-size-adjust: 100%;
-  -webkit-tap-highlight-color: transparent;
-}
-
-body {
-  background: var(--bg);
-  color: var(--label);
-  font-family: var(--font-sans);
-  font-size: 15px;
-  line-height: 22px;
-}
-
-:lang(zh) {
-  letter-spacing: 0;
-}
-
-.tabular {
-  font-variant-numeric: tabular-nums;
-}
-
-:focus-visible {
-  outline: 2px solid var(--tint);
-  outline-offset: 2px;
-}
-
-/* 底部 sheet 动画 */
-@keyframes sheet-in {
-  from {
-    transform: translateY(100%);
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
   }
-  to {
-    transform: translateY(0);
-  }
-}
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-.sheet-in {
-  animation: sheet-in 340ms cubic-bezier(0.32, 0.72, 0, 1);
-}
-.fade-in {
-  animation: fade-in 200ms ease-out;
-}
 
-/* 浮在内容上的工具栏用玻璃；不支持就用实色 */
-.material {
-  background: var(--surface);
-}
-@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .material {
-    background: color-mix(in srgb, var(--surface) 78%, transparent);
-    -webkit-backdrop-filter: blur(24px) saturate(150%);
-    backdrop-filter: blur(24px) saturate(150%);
+  body {
+    background: var(--bg);
+    color: var(--label);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.45;
   }
-}
-@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  .material {
-    background: var(--surface);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
+
+  ::selection {
+    background: var(--volt);
+    color: var(--ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--tint);
+    outline-offset: 2px;
+  }
+  .grid-lines :focus-visible,
+  .on-color :focus-visible {
+    outline-color: var(--ink);
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .sheet-in,
+/* components 层：自订 class 放这里，Tailwind 的 utility（例如 leading-*、text-*）可以盖过 */
+@layer components {
+  /* 超粗大标题（ManyChat 的 headline 感觉） */
+  .display {
+    font-family: var(--font-display);
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    line-height: 1;
+    font-optical-sizing: auto;
+  }
+
+  /* 全大写等宽小标签 */
+  .label-mono {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* 黄色区块上的细格线 */
+  .grid-lines {
+    background-color: var(--volt);
+    background-image:
+      linear-gradient(to right, var(--grid) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+    background-size: 64px 64px;
+    background-position: -1px -1px;
+    color: var(--ink);
+  }
+
+  /* 下拉选单的箭头 */
+  .select-chevron {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-size: 16px;
+  }
+
+  /* 亮黄的行 / 区块里：深色模式也用浅色的字和白色输入框 */
+.on-volt {
+  --field: #ffffff;
+  --label: var(--ink);
+  --label-2: rgba(15, 15, 15, 0.62);
+  --label-3: rgba(15, 15, 15, 0.4);
+  --separator: rgba(15, 15, 15, 0.12);
+  --fill: rgba(15, 15, 15, 0.06);
+  --tint: var(--ink);
+  color: var(--ink);
+}
+
+/* 卡片里的输入框用白底，才看得出来 */
+  .card {
+    --field: var(--field-card);
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 底部 sheet 动画 */
+  @keyframes sheet-in {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: translateY(-6px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .sheet-in {
+    animation: sheet-in 340ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
   .fade-in {
-    animation: none;
+    animation: fade-in 200ms ease-out;
   }
-}
+  .pop-in {
+    animation: pop-in 220ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  }
 
-.press:active {
-  transform: scale(0.97);
+  /* 浮在内容上的 bar：半透明 + 模糊；不支持就用实色 */
+  .material {
+    background: var(--bg);
+  }
+  @supports (
+    (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+  ) {
+    .material {
+      background: color-mix(in srgb, var(--bg) 80%, transparent);
+      -webkit-backdrop-filter: blur(16px) saturate(140%);
+      backdrop-filter: blur(16px) saturate(140%);
+    }
+  }
+  @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+    .material {
+      background: var(--bg);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+  }
+
+  .press:active {
+    transform: scale(0.97);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sheet-in,
+    .fade-in,
+    .pop-in {
+      animation: none;
+    }
+    .press:active {
+      transform: none;
+    }
+  }
 }
 
 input[type="number"]::-webkit-inner-spin-button,

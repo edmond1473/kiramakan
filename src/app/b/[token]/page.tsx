@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { unstable_rethrow } from "next/navigation";
 import { billByToken, billView, loadWorld, type BillView } from "@/lib/server/world";
 import { FriendBill } from "./FriendBill";
@@ -7,6 +7,7 @@ import { SetupProblem } from "@/components/SetupProblem";
 import { formatRM } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
+export const viewport: Viewport = { themeColor: "#fff100" };
 
 export async function generateMetadata(props: PageProps<"/b/[token]">): Promise<Metadata> {
   try {

@@ -1,8 +1,24 @@
-import { Plus, ReceiptText } from "lucide-react";
+import type { Viewport } from "next";
+import { ArrowRight, Plus } from "lucide-react";
+import Link from "next/link";
 import { pageUser } from "@/lib/server/auth";
 import { balancesFor, billView, loadWorld } from "@/lib/server/world";
-import { Avatar, Empty, Group, LinkButton, Money, PageHeader, Row, daysSince, formatDate, formatDateShort } from "@/components/ui";
-import { formatRM } from "@/lib/money";
+import {
+  Avatar,
+  BigMoney,
+  Group,
+  Hero,
+  LinkButton,
+  Money,
+  Row,
+  Squiggle,
+  Tag,
+  daysSince,
+  formatDate,
+  formatDateShort,
+} from "@/components/ui";
+
+export const viewport: Viewport = { themeColor: "#fff100" };
 
 function agoLabel(days: number): string {
   if (days <= 0) return "今天";
@@ -23,42 +39,53 @@ export default async function Home() {
     .sort()[0];
   const recent = w.bills.slice(0, 12).map((b) => billView(w, b.id)!);
   const name = (id: string) => w.people.get(id)?.name ?? "?";
+  const noBills = w.bills.length === 0;
 
   return (
     <main>
-      <PageHeader
-        title="账本"
-        action={
-          <LinkButton href="/bills/new" variant="filled" size="sm">
-            <Plus className="size-4" strokeWidth={2.5} /> 新增一餐
-          </LinkButton>
-        }
-      />
+      <h1 className="sr-only">账本</h1>
+      <Hero className="pt-[max(10px,env(safe-area-inset-top))]">
+        <div className="flex h-12 items-center justify-between gap-3">
+          <span className="display text-[22px] tracking-[-0.035em]">KiraMakan</span>
+          <span className="label-mono truncate opacity-70">{me.name}</span>
+        </div>
+
+        {totalOwedToMe > 0 ? (
+          <>
+            <p className="label-mono mt-9">别人还欠你</p>
+            <div className="relative mt-3 inline-block">
+              <BigMoney cents={totalOwedToMe} className="text-[68px] leading-[0.86]" />
+              <Squiggle className="absolute inset-x-0 -bottom-4 w-full" />
+            </div>
+            <p className="mt-7 text-[15px] leading-[22px]">
+              {owedToMe.length} 个人还没还清{oldest && `，最早一笔是${agoLabel(daysSince(oldest))}`}。
+            </p>
+          </>
+        ) : noBills ? (
+          <>
+            <p className="label-mono mt-9">还没有账单</p>
+            <p className="display mt-3 text-[52px] leading-[0.95]">第一餐从这里开始</p>
+            <p className="mt-4 max-w-[30ch] text-[15px] leading-[22px]">拍下 receipt，AI 会拆好每个 item，tax 自动摊给每个人。</p>
+          </>
+        ) : (
+          <>
+            <p className="label-mono mt-9">别人还欠你</p>
+            <p className="display mt-3 text-[52px] leading-[0.95]">大家都还清了</p>
+            <p className="mt-4 text-[15px] leading-[22px]">没有人欠你钱。</p>
+          </>
+        )}
+        {totalIOwe > 0 && (
+          <p className="mt-1.5 text-[15px] leading-[22px]">
+            你欠别人 <Money cents={totalIOwe} className="font-semibold" />。
+          </p>
+        )}
+
+        <LinkButton href="/bills/new" variant="ink" size="lg" full className="mt-7">
+          <Plus className="size-5" strokeWidth={2.5} aria-hidden /> 新增一餐
+        </LinkButton>
+      </Hero>
 
       <div className="px-4">
-        <section className="mt-4 rounded-xl bg-surface p-4">
-          {totalOwedToMe > 0 ? (
-            <>
-              <p className="text-[15px] leading-5 text-label-2">别人还欠你</p>
-              <p className="tabular mt-1 text-[34px] leading-[40px] font-bold tracking-[-0.01em]">{formatRM(totalOwedToMe)}</p>
-              <p className="mt-1 text-[13px] leading-[18px] text-label-2">
-                {owedToMe.length} 个人还没还清
-                {oldest && ` · 最早一笔是${agoLabel(daysSince(oldest))}`}
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="text-[17px] leading-6 font-semibold">大家都还清了 ✓</p>
-              <p className="mt-1 text-[13px] leading-[18px] text-label-2">没有人欠你钱。</p>
-            </>
-          )}
-          {totalIOwe > 0 && (
-            <p className="mt-3 border-t border-separator pt-3 text-[14px] leading-5">
-              你欠别人 <Money cents={totalIOwe} className="font-semibold" />
-            </p>
-          )}
-        </section>
-
         {owedToMe.length > 0 && (
           <Group title="还没还你的">
             {owedToMe.map((r) => {
@@ -69,14 +96,16 @@ export default async function Home() {
                   key={r.debtorId}
                   href={`/people/${r.debtorId}`}
                   leading={<Avatar name={name(r.debtorId)} />}
-                  trailing={<Money cents={r.ledger.balance} className="text-[15px] font-semibold" />}
+                  trailing={<Money cents={r.ledger.balance} className="text-[16px] font-semibold" />}
                   chevron
                 >
-                  <p className="truncate text-[15px] leading-5 font-semibold">{name(r.debtorId)}</p>
-                  <p className="mt-0.5 truncate text-[13px] leading-[18px] text-label-2">
-                    {r.openCharges.length} 餐{first && ` · 最早 ${formatDateShort(first)}`}
-                    {forgotTax && <span className="text-orange-text"> · 忘了 tax</span>}
-                  </p>
+                  <p className="truncate text-[16px] leading-[21px] font-semibold">{name(r.debtorId)}</p>
+                  <div className="mt-1 flex min-w-0 items-center gap-2">
+                    <span className="truncate text-[13px] leading-[18px] text-label-2">
+                      {r.openCharges.length} 餐{first && ` · 最早 ${formatDateShort(first)}`}
+                    </span>
+                    {forgotTax && <Tag tone="flare">忘了 tax</Tag>}
+                  </div>
                 </Row>
               );
             })}
@@ -92,14 +121,16 @@ export default async function Home() {
                   key={p.creditorId}
                   href={`/people/${p.creditorId}`}
                   leading={<Avatar name={name(p.creditorId)} />}
-                  trailing={<Money cents={p.ledger.balance} className="text-[15px] font-semibold" />}
+                  trailing={<Money cents={p.ledger.balance} className="text-[16px] font-semibold" />}
                   chevron
                 >
-                  <p className="truncate text-[15px] leading-5 font-semibold">{name(p.creditorId)}</p>
-                  <p className="mt-0.5 truncate text-[13px] leading-[18px] text-label-2">
-                    {p.ledger.balance < 0 ? "你多给了" : `${p.openCharges.length} 餐`}
-                    {mutual && <span className="text-tint-text"> · 可以互抵</span>}
-                  </p>
+                  <p className="truncate text-[16px] leading-[21px] font-semibold">{name(p.creditorId)}</p>
+                  <div className="mt-1 flex min-w-0 items-center gap-2">
+                    <span className="truncate text-[13px] leading-[18px] text-label-2">
+                      {p.ledger.balance < 0 ? "你多给了" : `${p.openCharges.length} 餐`}
+                    </span>
+                    {mutual && <Tag tone="indigo">可以互抵</Tag>}
+                  </div>
                 </Row>
               );
             })}
@@ -113,46 +144,52 @@ export default async function Home() {
                 key={r.debtorId}
                 href={`/people/${r.debtorId}`}
                 leading={<Avatar name={name(r.debtorId)} />}
-                trailing={<Money cents={-r.ledger.balance} className="text-[15px] font-semibold" />}
+                trailing={<Money cents={-r.ledger.balance} className="text-[16px] font-semibold" />}
                 chevron
               >
-                <p className="truncate text-[15px] leading-5 font-semibold">{name(r.debtorId)}</p>
+                <p className="truncate text-[16px] leading-[21px] font-semibold">{name(r.debtorId)}</p>
               </Row>
             ))}
           </Group>
         )}
 
-        {recent.length > 0 ? (
-          <Group title="最近的单">
+        {recent.length > 0 && (
+          <Group
+            title="最近的单"
+            action={
+              w.bills.length > recent.length ? (
+                <Link href="/bills" className="label-mono inline-flex items-center gap-1 text-label underline-offset-4 active:opacity-60">
+                  全部 {w.bills.length} 张 <ArrowRight className="size-3.5" strokeWidth={2.5} aria-hidden />
+                </Link>
+              ) : null
+            }
+          >
             {recent.map((b) => {
               const debtors = b.participants.filter((p) => !p.isPayer && p.owed > 0);
               const paid = debtors.filter((p) => p.status === "paid").length;
               return (
-                <Row key={b.id} href={`/bills/${b.id}`} chevron trailing={<Money cents={b.totalCents} className="text-[15px]" />}>
-                  <p className="truncate text-[15px] leading-5 font-semibold">{b.title}</p>
+                <Row key={b.id} href={`/bills/${b.id}`} chevron trailing={<Money cents={b.totalCents} className="text-[16px] font-semibold" />}>
+                  <p className="truncate text-[16px] leading-[21px] font-semibold">{b.title}</p>
                   <p className="mt-0.5 truncate text-[13px] leading-[18px] text-label-2">
                     {formatDate(b.billDate)} · {b.payer.personId === me.personId ? "你付的" : `${b.payer.name} 付的`}
-                    {debtors.length > 0 &&
-                      (paid === debtors.length ? (
-                        <span className="text-green-text"> · 全部已付</span>
-                      ) : (
-                        <> · {paid}/{debtors.length} 已付</>
-                      ))}
-                    {b.unassigned.owed > 0 && <span className="text-orange-text"> · 还有 item 没人认领</span>}
                   </p>
+                  {(debtors.length > 0 || b.unassigned.owed > 0) && (
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {debtors.length > 0 &&
+                        (paid === debtors.length ? (
+                          <Tag tone="forest">全部已付 ✓</Tag>
+                        ) : (
+                          <Tag tone="mist">
+                            {paid}/{debtors.length} 已付
+                          </Tag>
+                        ))}
+                      {b.unassigned.owed > 0 && <Tag tone="volt">有 item 没人认领</Tag>}
+                    </div>
+                  )}
                 </Row>
               );
             })}
-            {w.bills.length > recent.length && (
-              <Row href="/bills" chevron>
-                <span className="text-[15px] text-tint-text">看全部 {w.bills.length} 张单</span>
-              </Row>
-            )}
           </Group>
-        ) : (
-          <Empty icon={<ReceiptText className="size-11" strokeWidth={1.5} />} title="还没有账单">
-            按右上角「新增一餐」，拍下 receipt 就开始。
-          </Empty>
         )}
       </div>
     </main>

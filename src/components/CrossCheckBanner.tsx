@@ -5,7 +5,7 @@ import type { CrossCheck, ReadItem } from "@/lib/receipt-compare";
 import { formatRM } from "@/lib/money";
 import { cx } from "./ui";
 
-/** 核对画面顶部：两个 AI 读的结果比对 */
+/** 核对画面顶部：两个 AI 读的结果比对（整块颜色 = 结果） */
 export function CrossCheckBanner({
   check,
   extraItems,
@@ -16,23 +16,25 @@ export function CrossCheckBanner({
   onAddExtra: (item: ReadItem & { from: string }) => void;
 }) {
   const tone = {
-    match: { bg: "bg-[color-mix(in_srgb,var(--green)_14%,transparent)]", Icon: Check, icon: "text-green-text" },
-    picked: { bg: "bg-[color-mix(in_srgb,var(--orange)_14%,transparent)]", Icon: TriangleAlert, icon: "text-orange-text" },
-    unsure: { bg: "bg-[color-mix(in_srgb,var(--red)_12%,transparent)]", Icon: CircleAlert, icon: "text-red-text" },
-    single: { bg: "bg-tint-soft", Icon: Info, icon: "text-tint-text" },
+    match: { bg: "bg-forest text-white", Icon: Check },
+    picked: { bg: "bg-volt text-ink", Icon: TriangleAlert },
+    unsure: { bg: "bg-flare text-ink", Icon: CircleAlert },
+    single: { bg: "bg-indigo text-white", Icon: Info },
   }[check.status];
   const { Icon } = tone;
 
   return (
-    <section className={cx("mt-4 rounded-xl px-4 py-3", tone.bg)} aria-label="两个 AI 的比对结果">
-      <div className="flex gap-2.5">
-        <Icon className={cx("mt-0.5 size-5 shrink-0", tone.icon)} strokeWidth={2} aria-hidden />
+    <section className={cx("on-color mt-6 rounded-[24px] p-5", tone.bg)} aria-label="两个 AI 的比对结果">
+      <div className="flex gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-current/15">
+          <Icon className="size-5" strokeWidth={2.5} aria-hidden />
+        </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[14px] leading-5 font-medium">{check.message}</p>
-          <ul className="mt-1.5 space-y-0.5 text-[13px] leading-[18px] text-label-2">
+          <p className="pt-1.5 text-[16px] leading-[22px] font-semibold">{check.message}</p>
+          <ul className="mt-3 space-y-1.5 font-mono text-[12px] leading-[17px] tracking-[0.02em]">
             {check.providers.map((p) => (
-              <li key={p.provider} className="tabular">
-                <span className="font-medium text-label">{p.label}</span>
+              <li key={p.provider} className="tabular opacity-90">
+                <span className="font-medium uppercase">{p.label}</span>
                 {p.ok ? (
                   <>
                     ：{p.itemCount} 个 item，总额 {formatRM(p.totalCents ?? 0)}
@@ -46,7 +48,7 @@ export function CrossCheckBanner({
             ))}
           </ul>
           {check.totals && (
-            <p className="tabular mt-2 text-[13px] leading-[18px] font-medium text-red-text">
+            <p className="tabular mt-3 text-[13px] leading-[18px] font-semibold">
               总额读得不一样：{check.totals.map((t) => `${t.label} ${formatRM(t.totalCents)}`).join("、")}。请看 receipt 上最后付的数目。
             </p>
           )}
@@ -54,23 +56,23 @@ export function CrossCheckBanner({
       </div>
 
       {extraItems.length > 0 && (
-        <div className="mt-3 border-t border-separator pt-3">
-          <p className="text-[13px] leading-[18px] text-label-2">
+        <div className="mt-4 border-t border-current/20 pt-4">
+          <p className="text-[13px] leading-[18px] opacity-90">
             {extraItems[0].from} 还读到这些，{check.chosenLabel} 没有。是 receipt 上有的就加进来：
           </p>
-          <ul className="mt-2 space-y-2">
+          <ul className="mt-3 space-y-2">
             {extraItems.map((e, i) => (
               <li key={`${e.name}-${i}`} className="flex items-center gap-3">
-                <span className="min-w-0 flex-1 text-[14px] leading-5">
+                <span className="min-w-0 flex-1 text-[15px] leading-5 font-medium">
                   {e.name}
-                  {e.qty !== 1 && ` ×${e.qty}`} <span className="tabular text-label-2">{formatRM(e.lineCents)}</span>
+                  {e.qty !== 1 && ` ×${e.qty}`} <span className="tabular opacity-75">{formatRM(e.lineCents)}</span>
                 </span>
                 <button
                   type="button"
                   onClick={() => onAddExtra(e)}
-                  className="press inline-flex h-8 shrink-0 items-center gap-1 rounded-lg bg-surface px-3 text-[13px] font-semibold text-tint-text"
+                  className="press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-white px-4 font-mono text-[12px] font-medium tracking-[0.05em] text-ink uppercase"
                 >
-                  <Plus className="size-3.5" strokeWidth={2.5} /> 加进来
+                  <Plus className="size-3.5" strokeWidth={2.75} /> 加进来
                 </button>
               </li>
             ))}

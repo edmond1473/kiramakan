@@ -30,7 +30,7 @@ export function AuthForm({ mode }: { mode: "login" | "setup" }) {
   }
 
   return (
-    <form onSubmit={submit} className="mt-8 space-y-4">
+    <form onSubmit={submit} className="space-y-5">
       {mode === "setup" && (
         <Field label="你的名字（朋友看到的）" value={name} onChange={(e) => setName(e.target.value)} placeholder="例如 Jusbie" required />
       )}
@@ -54,7 +54,7 @@ export function AuthForm({ mode }: { mode: "login" | "setup" }) {
         required
       />
       {error && <Notice tone="error">{error}</Notice>}
-      <Button type="submit" variant="filled" size="lg" full loading={busy}>
+      <Button type="submit" variant="tinted" size="lg" full loading={busy}>
         {mode === "setup" ? "建立帐号" : "登入"}
       </Button>
     </form>

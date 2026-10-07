@@ -7,7 +7,7 @@ import { api } from "@/lib/client/api";
 import { formatRM } from "@/lib/money";
 import { ItemAssigner } from "@/components/ItemAssigner";
 import { PayCard } from "@/components/PayCard";
-import { Avatar, Button, Group, Money, Notice, Row, StatusChip, cx, formatDate } from "@/components/ui";
+import { Avatar, BigMoney, Button, Group, Hero, Money, Notice, Row, StatusChip, Tag, cx, formatDate } from "@/components/ui";
 import { Sheet, Toaster, toast, useIsClient } from "@/components/ui-client";
 
 const ME_KEY = "km:me";
@@ -96,56 +96,60 @@ export function FriendBill({ token, initialView }: { token: string; initialView:
   }
 
   const payAmount = meP ? (meP.remaining > 0 ? meP.remaining : meP.owed) : 0;
+  const unpaidOthers = others.filter((p) => p.owed > 0 && p.status !== "paid");
 
   return (
-    <div className="mx-auto min-h-dvh max-w-lg pb-[calc(110px+env(safe-area-inset-bottom))]">
-      <header className="px-4 pt-6">
-        <p className="text-[13px] leading-[18px] font-medium text-label-2">
-          {formatDate(view.billDate)} · {view.payer.name} 付的
+    <div className="mx-auto min-h-dvh max-w-lg pb-[calc(128px+env(safe-area-inset-bottom))]">
+      <Hero className="pt-[max(10px,env(safe-area-inset-top))]">
+        <div className="flex h-12 items-center justify-between gap-3">
+          <span className="display text-[20px] tracking-[-0.035em]">KiraMakan</span>
+          <span className="label-mono opacity-70">{formatDate(view.billDate)}</span>
+        </div>
+        <p className="label-mono mt-8">{view.payer.name} 付的</p>
+        <h1 className="display mt-3 text-[46px] leading-[0.95] text-balance break-words">{view.title}</h1>
+        <p className="tabular mt-4 text-[15px] leading-[22px]">
+          总共 <span className="font-semibold">{formatRM(view.totalCents)}</span>
+          {view.factor > 1.0001 && `，含 tax / service：每 RM 1 的 item 要付 RM ${view.factor.toFixed(2)}`}
         </p>
-        <h1 className="mt-1 text-[28px] leading-[34px] font-bold tracking-[-0.01em]">{view.title}</h1>
-        <p className="tabular mt-1 text-[15px] leading-[22px] text-label-2">
-          总共 {formatRM(view.totalCents)}
-          {view.factor > 1.0001 && ` · 含 tax / service（每 RM 1 的 item 要付 RM ${view.factor.toFixed(2)}）`}
-        </p>
-      </header>
+      </Hero>
 
       <div className="px-4">
         {view.locked && (
-          <div className="mt-4">
+          <div className="mt-6">
             <Notice>
-              <span className="inline-flex items-center gap-1.5">
-                <Lock className="size-4" strokeWidth={2} /> {view.payer.name} 已经锁定这张单，item 不能再改。
+              <span className="inline-flex items-center gap-2">
+                <Lock className="size-4 shrink-0" strokeWidth={2.25} /> {view.payer.name} 已经锁定这张单，item 不能再改。
               </span>
             </Notice>
           </div>
         )}
 
         {ready && !meP && (
-          <section className="mt-5 rounded-xl bg-surface p-4">
-            <p className="text-[17px] leading-6 font-semibold">你是谁？</p>
-            <p className="mt-1 text-[13px] leading-[18px] text-label-2">点你的名字，然后点你吃了的东西。</p>
-            <div className="mt-3 flex flex-wrap gap-2">
+          <section className="card mt-6 rounded-[24px] bg-surface p-5">
+            <p className="display text-[30px]">你是谁？</p>
+            <p className="mt-2 text-[14px] leading-5 text-label-2">点你的名字，然后点你吃了的东西。</p>
+            <div className="mt-5 flex flex-wrap gap-2">
               {others.map((p) => (
                 <button
                   key={p.personId}
                   onClick={() => choose(p.personId)}
-                  className="press inline-flex h-10 items-center rounded-full bg-fill px-4 text-[15px] font-medium"
+                  className="press inline-flex h-12 items-center gap-2.5 rounded-full bg-bg pr-5 pl-1.5 text-[16px] font-semibold ring-1 ring-separator active:bg-fill"
                 >
+                  <Avatar name={p.name} size={36} />
                   {p.name}
                 </button>
               ))}
               {!view.locked && (
                 <button
                   onClick={() => setShowJoin(true)}
-                  className="press inline-flex h-10 items-center gap-1 rounded-full bg-tint-soft px-4 text-[15px] font-medium text-tint-text"
+                  className="press label-mono inline-flex h-12 items-center gap-1.5 rounded-full border-[1.5px] border-dashed border-label-3 px-4 text-label"
                 >
-                  <UserPlus className="size-4" strokeWidth={2} /> 名单里没有我
+                  <UserPlus className="size-4" strokeWidth={2.25} /> 名单里没有我
                 </button>
               )}
             </div>
             {showJoin && (
-              <div className="mt-3 flex gap-2">
+              <div className="mt-4 flex gap-2">
                 <input
                   autoFocus
                   value={joinName}
@@ -153,16 +157,16 @@ export function FriendBill({ token, initialView }: { token: string; initialView:
                   onKeyDown={(e) => e.key === "Enter" && join()}
                   placeholder="你的名字"
                   aria-label="你的名字"
-                  className="h-11 min-w-0 flex-1 rounded-[10px] border border-separator bg-surface px-3.5 text-[16px] outline-none focus:border-tint"
+                  className="h-12 min-w-0 flex-1 rounded-[12px] border-[1.5px] border-transparent bg-field px-4 text-[16px] outline-none placeholder:text-label-3 focus:border-label"
                 />
-                <Button variant="filled" loading={joining} disabled={!joinName.trim()} onClick={join}>
+                <Button variant="tinted" loading={joining} disabled={!joinName.trim()} onClick={join}>
                   加入
                 </Button>
               </div>
             )}
             <button
               onClick={() => choose(view.payer.personId)}
-              className="mt-4 text-[13px] leading-[18px] text-tint-text"
+              className="mt-5 text-[13px] leading-[18px] text-label-2 underline underline-offset-4"
             >
               我是 {view.payer.name}（付钱的人）
             </button>
@@ -170,19 +174,21 @@ export function FriendBill({ token, initialView }: { token: string; initialView:
         )}
 
         {meP && (
-          <div className="mt-4 flex items-center justify-between rounded-xl bg-surface px-4 py-2.5">
-            <span className="flex items-center gap-2 text-[15px]">
-              <Avatar name={meP.name} size={28} tint />
-              你是 <span className="font-semibold">{meP.name}</span>
+          <div className="mt-6 flex items-center justify-between gap-3 rounded-full bg-surface p-1.5">
+            <span className="flex min-w-0 items-center gap-2.5 text-[15px]">
+              <Avatar name={meP.name} size={36} tint />
+              <span className="truncate">
+                你是 <span className="font-semibold">{meP.name}</span>
+              </span>
             </span>
-            <button onClick={() => choose(null)} className="text-[15px] text-tint-text">
+            <Button size="sm" onClick={() => choose(null)}>
               换人
-            </button>
+            </Button>
           </div>
         )}
 
-        <section className="mt-6">
-          <h2 className="mb-2 px-4 text-[13px] leading-[18px] font-medium text-label-2">
+        <section className="mt-8">
+          <h2 className="label-mono mb-2.5 px-1 text-label-2">
             {meP && !view.locked ? "点你吃了的东西（几个人一起吃就一起点）" : "这餐吃了什么"}
           </h2>
           <ItemAssigner
@@ -199,60 +205,58 @@ export function FriendBill({ token, initialView }: { token: string; initialView:
           {view.participants.map((p) => (
             <Row
               key={p.personId}
-              leading={<Avatar name={p.name} size={32} tint={p.personId === me} />}
+              leading={<Avatar name={p.name} size={36} tint={p.personId === me} />}
               trailing={
-                <div className="flex flex-col items-end">
-                  {p.owed > 0 && <Money cents={p.owed} className="text-[15px] font-semibold" />}
+                <div className="flex flex-col items-end gap-1">
+                  {p.owed > 0 && <Money cents={p.owed} className="text-[16px] font-semibold" />}
                   <StatusChip status={p.status} remaining={p.remaining} />
                 </div>
               }
             >
-              <span className={cx("text-[15px]", p.personId === me && "font-semibold")}>{p.name}</span>
+              <span className={cx("text-[16px]", p.personId === me && "font-semibold")}>{p.name}</span>
             </Row>
           ))}
         </Group>
         {view.unassigned.owed > 0 && (
-          <p className="mt-2 px-4 text-[12px] leading-4 text-label-2">
-            还有 {formatRM(view.unassigned.owed)} 的 item 没人认领。
-          </p>
+          <p className="mt-2.5 px-1 text-[12px] leading-4 text-label-2">还有 {formatRM(view.unassigned.owed)} 的 item 没人认领。</p>
         )}
-        <p className="mt-6 px-4 text-center text-[12px] leading-4 text-label-3">KiraMakan · 拍 receipt 自动分账</p>
+        <p className="label-mono mt-10 text-center text-label-3">KiraMakan · 拍 receipt 自动分账</p>
       </div>
 
-      {meP && !meP.isPayer && (
-        <div className="material bottom-safe fixed inset-x-0 z-40 border-t border-separator">
-          <div className="mx-auto flex max-w-lg items-center gap-3 px-4 py-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-[12px] leading-4 text-label-2">{meP.status === "paid" ? "你这餐" : "你要付"}</p>
-              {meP.status === "paid" ? (
-                <p className="text-[17px] leading-6 font-semibold text-green-text">已付 ✓</p>
-              ) : (
-                <p className="tabular text-[22px] leading-7 font-bold">
-                  {formatRM(payAmount)}
-                  {meP.status === "forgot_tax" && <span className="ml-2 text-[13px] font-medium text-orange-text">补 tax</span>}
-                </p>
-              )}
-            </div>
-            {meP.status !== "paid" && meP.owed > 0 && (
-              <Button variant="filled" size="lg" onClick={() => setPayOpen(true)}>
-                去付款
-              </Button>
+      {meP && (
+        <div className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(12px,env(safe-area-inset-bottom))]">
+          <div className="mx-auto flex max-w-lg items-center gap-3 rounded-[30px] bg-ink py-2 pr-2 pl-5 text-white dark:bg-surface-2 dark:ring-1 dark:ring-separator">
+            {meP.isPayer ? (
+              <p className="min-h-11 flex-1 py-2.5 pr-3 text-[15px] leading-[22px]">
+                你是付钱的人。还没付的：{unpaidOthers.map((p) => p.name).join("、") || "没有了 ✓"}
+              </p>
+            ) : (
+              <>
+                <div className="min-w-0 flex-1 py-1">
+                  <p className="label-mono text-white/60">{meP.status === "paid" ? "你这餐" : "你要付"}</p>
+                  {meP.status === "paid" ? (
+                    <p className="display mt-1 text-[26px] text-volt">已付 ✓</p>
+                  ) : (
+                    <div className="mt-1 flex items-center gap-2">
+                      <BigMoney cents={payAmount} className="text-[30px] leading-none" />
+                      {meP.status === "forgot_tax" && <Tag tone="flare">补 tax</Tag>}
+                    </div>
+                  )}
+                </div>
+                {meP.status !== "paid" && meP.owed > 0 && (
+                  <Button variant="filled" size="lg" className="px-6" onClick={() => setPayOpen(true)}>
+                    去付款
+                  </Button>
+                )}
+              </>
             )}
-          </div>
-        </div>
-      )}
-      {meP && meP.isPayer && (
-        <div className="material bottom-safe fixed inset-x-0 z-40 border-t border-separator">
-          <div className="mx-auto max-w-lg px-4 py-3 text-[15px]">
-            你是付钱的人。还没付的：
-            {others.filter((p) => p.owed > 0 && p.status !== "paid").map((p) => p.name).join("、") || "没有了 ✓"}
           </div>
         </div>
       )}
 
       <Sheet open={payOpen} onClose={() => setPayOpen(false)} title="付款">
         {meP && (
-          <div className="pt-1 pb-2">
+          <div className="pb-2">
             {meP.status === "forgot_tax" && (
               <div className="mb-3">
                 <Notice tone="warn">你之前只给了 item 的钱，还差 tax / service charge。</Notice>
@@ -263,9 +267,7 @@ export function FriendBill({ token, initialView }: { token: string; initialView:
               amountCents={payAmount}
               breakdown={meP.paid === 0 ? { preTax: meP.preTax, owed: meP.owed } : null}
             />
-            <p className="mt-3 px-1 text-[12px] leading-4 text-label-2">
-              付了之后不用回来按什么，{view.payer.name} 那边会记录。
-            </p>
+            <p className="mt-3 px-1 text-[12px] leading-[17px] text-label-2">付了之后不用回来按什么，{view.payer.name} 那边会记录。</p>
           </div>
         )}
       </Sheet>

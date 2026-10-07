@@ -1,11 +1,13 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { currentUser, hasAnyUser } from "@/lib/server/auth";
 import { AuthForm } from "@/components/AuthForm";
 import { SetupProblem } from "@/components/SetupProblem";
+import { AuthShell } from "@/components/AuthShell";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "登入" };
+export const viewport: Viewport = { themeColor: "#fff100" };
 
 export default async function LoginPage() {
   try {
@@ -16,10 +18,8 @@ export default async function LoginPage() {
     return <SetupProblem error={e} />;
   }
   return (
-    <main className="mx-auto max-w-sm px-4 pt-16 pb-12">
-      <h1 className="text-[28px] leading-[34px] font-bold tracking-[-0.01em]">KiraMakan</h1>
-      <p className="mt-2 text-[15px] leading-[22px] text-label-2">登入后可以新增账单、记录谁还了钱。</p>
+    <AuthShell eyebrow="登入" title="KiraMakan" intro="拍 receipt、分 item、自动摊 tax。登入后可以新增账单、记录谁还了钱。">
       <AuthForm mode="login" />
-    </main>
+    </AuthShell>
   );
 }

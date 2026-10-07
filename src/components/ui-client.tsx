@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Check, Copy, Minus, Plus, X } from "lucide-react";
-import { cx } from "./ui";
+import { buttonClass, cx, type Variant } from "./ui";
 
 // ---------- 只在浏览器才有的值（不用 useEffect + setState） ----------
 
@@ -47,8 +47,8 @@ export function Toaster() {
         <div
           key={t.id}
           className={cx(
-            "fade-in max-w-sm rounded-full px-4 py-2.5 text-[14px] leading-5 font-medium shadow-[var(--shadow-pop)]",
-            t.tone === "error" ? "bg-surface text-red-text" : "bg-surface text-label",
+            "pop-in max-w-sm rounded-full px-5 py-3 text-[14px] leading-5 font-medium",
+            t.tone === "error" ? "bg-flare text-ink" : "bg-contrast text-on-contrast",
           )}
         >
           {t.message}
@@ -87,24 +87,29 @@ export function Sheet({
   }, [open, onClose]);
   if (!mounted || !open) return null;
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true">
-      <button aria-label="关闭" className="fade-in absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="sheet-in relative flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-[20px] bg-bg shadow-[var(--shadow-sheet)] sm:rounded-[20px]">
-        <div className="flex justify-center pt-2 sm:hidden">
-          <span className="h-1.5 w-9 rounded-full bg-fill-2" />
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label={typeof title === "string" ? title : undefined}
+    >
+      <button aria-label="关闭" className="fade-in absolute inset-0 bg-[var(--scrim)]" onClick={onClose} />
+      <div className="sheet-in relative flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-[32px] bg-bg sm:rounded-[32px] dark:border-t dark:border-separator">
+        <div className="flex justify-center pt-2.5 sm:hidden">
+          <span className="h-1 w-10 rounded-full bg-fill-2" />
         </div>
-        <div className="flex items-center justify-between gap-3 px-4 pt-2 pb-1">
-          <h2 className="min-w-0 truncate text-[17px] leading-6 font-semibold">{title}</h2>
+        <div className="flex items-start justify-between gap-3 px-5 pt-3 pb-3">
+          <h2 className="display min-w-0 pt-1 text-[26px] leading-[1.05] break-words">{title}</h2>
           <button
             aria-label="关闭"
             onClick={onClose}
-            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-fill text-label-2 active:bg-fill-2"
+            className="press flex size-9 shrink-0 items-center justify-center rounded-full bg-surface text-label active:bg-fill-2"
           >
-            <X className="size-4" strokeWidth={2.25} />
+            <X className="size-4" strokeWidth={2.5} />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">{children}</div>
-        {footer && <div className="pb-safe border-t border-separator px-4 pt-3">{footer}</div>}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">{children}</div>
+        {footer && <div className="pb-safe border-t border-separator px-5 pt-3">{footer}</div>}
       </div>
     </div>,
     document.body,
@@ -122,21 +127,28 @@ export function Field({
 }: ComponentProps<"input"> & { label?: string; hint?: string; error?: string | null }) {
   return (
     <label className={cx("block", className)}>
-      {label && <span className="mb-1.5 block px-1 text-[13px] leading-[18px] font-medium text-label-2">{label}</span>}
+      {label && <span className="label-mono mb-2 block px-1 text-label-2">{label}</span>}
       <input
         {...rest}
         className={cx(
-          "h-11 w-full rounded-[10px] bg-surface px-3.5 text-[16px] text-label outline-none placeholder:text-label-3",
-          "border focus:border-tint",
-          error ? "border-red" : "border-separator",
+          "h-12 w-full rounded-[12px] border-[1.5px] bg-field px-4 text-[16px] text-label outline-none transition-colors placeholder:text-label-3 focus:border-label",
+          error ? "border-red" : "border-transparent",
         )}
       />
       {error ? (
-        <span className="mt-1 block px-1 text-[12px] leading-4 text-red-text">{error}</span>
+        <span className="mt-1.5 block px-1 text-[12px] leading-4 text-red-text">{error}</span>
       ) : hint ? (
-        <span className="mt-1 block px-1 text-[12px] leading-4 text-label-2">{hint}</span>
+        <span className="mt-1.5 block px-1 text-[12px] leading-[17px] text-label-2">{hint}</span>
       ) : null}
     </label>
+  );
+}
+
+/** 下拉选单：样子跟 Field 一样（宽度由外面决定，例如 w-full） */
+export function selectClass(extra?: string) {
+  return cx(
+    "select-chevron h-12 rounded-[12px] border-[1.5px] border-transparent bg-field pr-10 pl-4 text-[16px] text-label outline-none focus:border-label",
+    extra,
   );
 }
 
@@ -152,7 +164,7 @@ export function Segmented<T extends string>({
   label: string;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="flex h-9 rounded-[9px] bg-fill p-0.5">
+    <div role="radiogroup" aria-label={label} className="flex h-11 rounded-full bg-surface p-1">
       {options.map((o) => (
         <button
           key={o.value}
@@ -160,8 +172,8 @@ export function Segmented<T extends string>({
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
           className={cx(
-            "min-w-0 flex-1 truncate rounded-[7px] px-2 text-[13px] font-medium transition-colors",
-            value === o.value ? "bg-surface text-label shadow-[0_1px_3px_rgba(0,0,0,0.12)] dark:bg-[#636366]" : "text-label-2",
+            "min-w-0 flex-1 truncate rounded-full px-3 font-mono text-[12px] font-medium tracking-[0.05em] uppercase transition-colors",
+            value === o.value ? "bg-contrast text-on-contrast" : "text-label-2",
           )}
         >
           {o.label}
@@ -171,37 +183,47 @@ export function Segmented<T extends string>({
   );
 }
 
+/** 黑色胶囊的 − 数字 + */
 export function Stepper({
   value,
   onChange,
   min = 0,
   max = 99,
   label,
+  tone = "contrast",
 }: {
   value: number;
   onChange: (v: number) => void;
   min?: number;
   max?: number;
   label: string;
+  /** ink = 永远黑色（放在亮黄的行上） */
+  tone?: "contrast" | "ink";
 }) {
   return (
-    <div className="inline-flex h-8 items-center rounded-lg bg-fill" aria-label={label}>
+    <div
+      className={cx(
+        "inline-flex h-9 shrink-0 items-center rounded-full",
+        tone === "ink" ? "bg-ink text-white" : "bg-contrast text-on-contrast",
+      )}
+      aria-label={label}
+    >
       <button
         aria-label={`${label} 减少`}
         disabled={value <= min}
         onClick={() => onChange(value - 1)}
-        className="flex h-8 w-9 items-center justify-center text-label disabled:text-label-3"
+        className="flex h-9 w-9 items-center justify-center rounded-full disabled:opacity-30"
       >
-        <Minus className="size-4" strokeWidth={2.25} />
+        <Minus className="size-4" strokeWidth={2.5} />
       </button>
-      <span className="tabular w-6 text-center text-[15px] font-semibold">{value}</span>
+      <span className="display tabular w-5 text-center text-[17px] tracking-normal">{value}</span>
       <button
         aria-label={`${label} 增加`}
         disabled={value >= max}
         onClick={() => onChange(value + 1)}
-        className="flex h-8 w-9 items-center justify-center text-label disabled:text-label-3"
+        className="flex h-9 w-9 items-center justify-center rounded-full disabled:opacity-30"
       >
-        <Plus className="size-4" strokeWidth={2.25} />
+        <Plus className="size-4" strokeWidth={2.5} />
       </button>
     </div>
   );
@@ -230,12 +252,14 @@ export function CopyButton({
   label,
   done = "已复制",
   variant = "tinted",
+  size = "md",
   full,
 }: {
   text: string;
   label: ReactNode;
   done?: string;
-  variant?: "tinted" | "gray" | "filled";
+  variant?: Variant;
+  size?: "md" | "lg" | "sm";
   full?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
@@ -243,11 +267,6 @@ export function CopyButton({
   useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current);
   }, []);
-  const cls = {
-    tinted: "bg-tint-soft text-tint-text",
-    gray: "bg-fill text-label",
-    filled: "bg-tint-fill text-white",
-  }[variant];
   return (
     <button
       type="button"
@@ -257,13 +276,9 @@ export function CopyButton({
           timer.current = setTimeout(() => setCopied(false), 1800);
         } else toast("复制不了，请长按自己复制", "error");
       }}
-      className={cx(
-        "press inline-flex h-11 items-center justify-center gap-1.5 rounded-[10px] px-4 text-[15px] font-semibold",
-        full && "w-full",
-        cls,
-      )}
+      className={buttonClass(variant, size, full)}
     >
-      {copied ? <Check className="size-4" strokeWidth={2.5} /> : <Copy className="size-4" strokeWidth={2} />}
+      {copied ? <Check className="size-4" strokeWidth={2.75} /> : <Copy className="size-4" strokeWidth={2.25} />}
       {copied ? done : label}
     </button>
   );

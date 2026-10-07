@@ -10,7 +10,7 @@ import { formatRM } from "@/lib/money";
 import { ItemAssigner } from "@/components/ItemAssigner";
 import { PaymentSheet } from "@/components/PaymentSheet";
 import { PeoplePicker } from "@/components/PeoplePicker";
-import { Avatar, Button, Group, Money, Notice, PageHeader, Row, StatusChip, cx, formatDate } from "@/components/ui";
+import { Avatar, Button, Group, Money, Notice, PageHeader, Row, StatusChip, buttonClass, cx, formatDate } from "@/components/ui";
 import { CopyButton, Sheet, Stepper, toast, useOrigin } from "@/components/ui-client";
 
 export function BillAdmin({
@@ -137,62 +137,74 @@ export function BillAdmin({
           </div>
         )}
 
-        <section className="mt-4 rounded-xl bg-surface p-4">
-          <p className="text-[15px] leading-5 font-semibold">给朋友的 link</p>
-          <p className="mt-1 text-[13px] leading-[18px] text-label-2">朋友打开后选自己的名字、点自己吃的，就看到含 tax 的金额和你的 QR。</p>
-          <p className="mt-2 truncate rounded-lg bg-fill px-3 py-2 font-mono text-[12px] text-label-2">{shareUrl || "…"}</p>
+        <section className="card mt-6 rounded-[24px] bg-surface p-5">
+          <p className="text-[20px] leading-6 font-semibold tracking-[-0.02em]">给朋友的 link</p>
+          <p className="mt-1.5 text-[14px] leading-5 text-label-2">朋友打开后选自己的名字、点自己吃的，就看到含 tax 的金额和你的 QR。</p>
+          <p className="mt-4 truncate rounded-[12px] bg-field px-4 py-3 font-mono text-[12px] text-label-2">{shareUrl || "…"}</p>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <a
               href={`https://wa.me/?text=${encodeURIComponent(whatsappText)}`}
               target="_blank"
               rel="noreferrer"
-              className="press inline-flex h-11 items-center justify-center gap-1.5 rounded-[10px] bg-tint-fill px-4 text-[15px] font-semibold text-white"
+              className={buttonClass("tinted", "md", true)}
             >
-              <MessageCircle className="size-[18px]" strokeWidth={2} /> WhatsApp
+              <MessageCircle className="size-[18px]" strokeWidth={2.25} /> WhatsApp
             </a>
-            <CopyButton text={shareUrl} label="复制 link" variant="gray" />
+            <CopyButton text={shareUrl} label="复制 link" variant="gray" full />
           </div>
         </section>
 
-        <section className="tabular mt-4 rounded-xl bg-surface p-4" aria-label="对账">
-          <p className="text-[15px] leading-5 font-semibold">对账</p>
-          <div className="mt-2 space-y-1 text-[15px] leading-[22px]">
+        <section
+          className={cx(
+            "on-color tabular mt-4 rounded-[24px] p-5",
+            view.unassigned.owed === 0 ? "bg-forest text-white" : "bg-flare text-ink",
+          )}
+          aria-label="对账"
+        >
+          <p className="label-mono opacity-75">对账</p>
+          {view.unassigned.owed === 0 ? (
+            <p className="display mt-3 flex items-start gap-2 text-[30px] leading-[1.05]">
+              <Check className="mt-0.5 size-7 shrink-0" strokeWidth={3.5} aria-hidden />
+              一样，{iAmPayer ? "你" : view.payer.name}不会少收
+            </p>
+          ) : (
+            <>
+              <p className="display mt-3 text-[30px] leading-[1.05]">差 {formatRM(view.unassigned.owed)}</p>
+              <p className="mt-2 text-[14px] leading-5">
+                还有 item 没人认领，现在{iAmPayer ? "你" : view.payer.name}会少收这么多。
+              </p>
+            </>
+          )}
+          <div className="mt-4 space-y-1.5 border-t border-current/20 pt-3.5 text-[15px] leading-[22px]">
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-label-2">大家要付的加起来</span>
+              <span className="opacity-80">大家要付的加起来</span>
               <span className="font-semibold">{formatRM(collectible)}</span>
             </div>
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-label-2">{iAmPayer ? "你付的总额" : `${view.payer.name} 付的总额`}</span>
+              <span className="opacity-80">{iAmPayer ? "你付的总额" : `${view.payer.name} 付的总额`}</span>
               <span className="font-semibold">{formatRM(view.totalCents)}</span>
             </div>
+            {view.unassigned.owed === 0 && othersOwe > 0 && (
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="opacity-80">要跟别人收</span>
+                <span className="font-semibold">{formatRM(othersOwe)}</span>
+              </div>
+            )}
           </div>
-          {view.unassigned.owed === 0 ? (
-            <p className="mt-2 flex items-center gap-1.5 text-[14px] leading-5 font-medium text-green-text">
-              <Check className="size-4" strokeWidth={2.5} aria-hidden /> 一样，{iAmPayer ? "你" : view.payer.name}不会少收
-              {othersOwe > 0 && <span className="font-normal text-label-2">（要跟别人收 {formatRM(othersOwe)}）</span>}
-            </p>
-          ) : (
-            <div className="mt-2 rounded-lg bg-[color-mix(in_srgb,var(--red)_12%,transparent)] px-3 py-2.5">
-              <p className="text-[14px] leading-5 font-medium">
-                差 {formatRM(view.unassigned.owed)}：还有 item 没人认领，现在{iAmPayer ? "你" : view.payer.name}会少收这么多。
-              </p>
-              {unclaimedItems.length > 0 ? (
-                <Button variant="tinted" size="sm" className="mt-2" onClick={splitUnclaimed}>
-                  <Users className="size-4" strokeWidth={2} /> 没人认领的 → 大家平分
-                </Button>
-              ) : (
-                <p className="mt-1 text-[13px] leading-[18px] text-label-2">在下面把剩下的份数分给吃的人。</p>
-              )}
-            </div>
-          )}
+          {view.unassigned.owed > 0 &&
+            (unclaimedItems.length > 0 ? (
+              <Button variant="ink" full className="mt-4" onClick={splitUnclaimed}>
+                <Users className="size-4" strokeWidth={2.25} /> 没人认领的 → 大家平分
+              </Button>
+            ) : (
+              <p className="mt-3 text-[13px] leading-[18px]">在下面把剩下的份数分给吃的人。</p>
+            ))}
         </section>
 
-        <section className="mt-6">
-          <div className="mb-2 flex items-end justify-between px-4">
-            <h2 className="text-[13px] leading-[18px] font-medium text-label-2">分 item：先选人，再点他吃的</h2>
-          </div>
+        <section className="mt-8">
+          <h2 className="label-mono mb-1 px-1 text-label-2">分 item：先选人，再点他吃的</h2>
           <div
-            className="material sticky top-0 z-30 -mx-4 flex gap-2 overflow-x-auto px-4 py-2"
+            className="material sticky top-0 z-30 -mx-4 flex gap-2 overflow-x-auto px-4 py-2.5"
             role="radiogroup"
             aria-label="正在分给谁"
           >
@@ -203,8 +215,8 @@ export function BillAdmin({
                 aria-checked={active === p.personId}
                 onClick={() => setActive(p.personId)}
                 className={cx(
-                  "press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[15px] font-medium",
-                  active === p.personId ? "bg-tint-fill text-white" : "bg-surface text-label",
+                  "press inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-4 text-[15px] font-semibold transition-colors",
+                  active === p.personId ? "bg-contrast text-on-contrast" : "bg-surface text-label",
                 )}
               >
                 {p.personId === me.personId ? `我` : p.name}
@@ -212,12 +224,12 @@ export function BillAdmin({
             ))}
             <button
               onClick={() => setAddOpen(true)}
-              className="press inline-flex h-9 shrink-0 items-center gap-1 rounded-full bg-tint-soft px-3.5 text-[15px] font-medium text-tint-text"
+              className="press label-mono inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border-[1.5px] border-dashed border-label-3 px-4 text-label"
             >
-              <UserPlus className="size-4" strokeWidth={2} /> 加人
+              <UserPlus className="size-4" strokeWidth={2.25} /> 加人
             </button>
           </div>
-          {!active && <p className="mb-2 px-1 text-[13px] leading-[18px] text-label-2">还没选人：点上面的名字开始。</p>}
+          {!active && <p className="mt-1 mb-3 px-1 text-[13px] leading-[18px] text-label-2">还没选人：点上面的名字开始。</p>}
           <ItemAssigner
             items={view.items}
             activePersonId={active}
@@ -235,46 +247,42 @@ export function BillAdmin({
           {participants.map((p) => (
             <Row
               key={p.personId}
-              leading={<Avatar name={p.name} size={32} tint={p.isPayer} />}
+              leading={<Avatar name={p.name} size={36} tint={p.isPayer} />}
               onClick={() => (p.isPayer ? undefined : setPersonSheet({ id: p.personId, name: p.name }))}
               trailing={
-                <div className="flex flex-col items-end">
-                  <Money cents={p.owed} className="text-[15px] font-semibold" />
+                <div className="flex flex-col items-end gap-1">
+                  <Money cents={p.owed} className="text-[16px] font-semibold" />
                   <StatusChip status={p.status} remaining={p.remaining} />
                 </div>
               }
             >
-              <p className="truncate text-[15px] leading-5 font-semibold">{p.personId === me.personId ? `${p.name}（我）` : p.name}</p>
-              <p className="tabular mt-0.5 text-[13px] leading-[18px] text-label-2">item {formatRM(p.preTax)}</p>
+              <p className="truncate text-[16px] leading-[21px] font-semibold">{p.personId === me.personId ? `${p.name}（我）` : p.name}</p>
+              <p className="tabular mt-1 font-mono text-[12px] leading-4 tracking-[0.03em] text-label-2 uppercase">item {formatRM(p.preTax)}</p>
             </Row>
           ))}
         </Group>
 
         <Group title="这张单">
           {view.hasReceipt && (
-            <Row href={`/api/bills/${view.id}/receipt`} external leading={<ImageIcon className="size-5 text-label-2" strokeWidth={1.75} />} chevron>
-              <span className="text-[15px]">看 receipt 照片</span>
+            <Row href={`/api/bills/${view.id}/receipt`} external leading={<ImageIcon className="size-5" strokeWidth={2} />} chevron>
+              <span className="text-[16px]">看 receipt 照片</span>
             </Row>
           )}
-          <Row href={`/bills/${view.id}/edit`} leading={<Pencil className="size-5 text-label-2" strokeWidth={1.75} />} chevron>
-            <span className="text-[15px]">修改 item、总额、谁付的</span>
+          <Row href={`/bills/${view.id}/edit`} leading={<Pencil className="size-5" strokeWidth={2} />} chevron>
+            <span className="text-[16px]">修改 item、总额、谁付的</span>
           </Row>
           <Row
             onClick={toggleLock}
             leading={
-              view.locked ? (
-                <Lock className="size-5 text-label-2" strokeWidth={1.75} />
-              ) : (
-                <LockOpen className="size-5 text-label-2" strokeWidth={1.75} />
-              )
+              view.locked ? <Lock className="size-5" strokeWidth={2} /> : <LockOpen className="size-5" strokeWidth={2} />
             }
-            trailing={<span className="text-[15px] text-tint-text">{view.locked ? "解锁" : "锁定"}</span>}
+            trailing={<span className={buttonClass("gray", "sm")}>{view.locked ? "解锁" : "锁定"}</span>}
           >
-            <p className="text-[15px]">{view.locked ? "已锁定" : "朋友还可以改"}</p>
-            <p className="text-[12px] leading-4 text-label-2">锁定后朋友不能再点 item，金额就固定了。</p>
+            <p className="text-[16px]">{view.locked ? "已锁定" : "朋友还可以改"}</p>
+            <p className="mt-0.5 text-[12px] leading-4 text-label-2">锁定后朋友不能再点 item，金额就固定了。</p>
           </Row>
-          <Row onClick={removeBill} leading={<Trash2 className="size-5 text-red-text" strokeWidth={1.75} />}>
-            <span className="text-[15px] text-red-text">删除这张单</span>
+          <Row onClick={removeBill} leading={<Trash2 className="size-5 text-red-text" strokeWidth={2} />}>
+            <span className="text-[16px] text-red-text">删除这张单</span>
           </Row>
         </Group>
         <div className="h-6" />
@@ -284,22 +292,20 @@ export function BillAdmin({
       <Sheet open={!!itemSheet} onClose={() => setItemSheet(null)} title={itemSheet ? `谁吃了 ${itemSheet.name}` : ""}>
         {itemSheet && (
           <div className="pt-1">
-            <p className="tabular text-[13px] leading-[18px] text-label-2">
+            <p className="tabular font-mono text-[12px] leading-4 tracking-[0.03em] text-label-2 uppercase">
               {itemSheet.qty !== 1 && `×${itemSheet.qty} · `}
               {formatRM(itemSheet.lineCents)}
               {Number.isInteger(itemSheet.qty) && itemSheet.qty > 1
                 ? ` · 每份 ${formatRM(Math.round(itemSheet.lineCents / itemSheet.qty))}`
                 : " · 几个人一起吃就平分"}
             </p>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <Button variant="tinted" size="sm" onClick={() => setItemAll(itemSheet, "all")}>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <Button variant="tinted" onClick={() => setItemAll(itemSheet, "all")}>
                 全部人平分
               </Button>
-              <Button size="sm" onClick={() => setItemAll(itemSheet, "none")}>
-                清除
-              </Button>
+              <Button onClick={() => setItemAll(itemSheet, "none")}>清除</Button>
             </div>
-            <div className="list mt-4 overflow-hidden rounded-xl bg-surface">
+            <div className="card list mt-4 overflow-hidden rounded-[24px] bg-surface">
               {participants.map((p) => {
                 const units = itemSheet.shares.find((s) => s.personId === p.personId)?.units ?? 0;
                 const countable = Number.isInteger(itemSheet.qty) && itemSheet.qty > 1;
@@ -318,16 +324,16 @@ export function BillAdmin({
                       ) : (
                         <span
                           className={cx(
-                            "flex size-6 items-center justify-center rounded-full border-2",
-                            units > 0 ? "border-tint bg-tint text-white" : "border-label-3",
+                            "flex size-[26px] items-center justify-center rounded-[6px] border-2",
+                            units > 0 ? "border-contrast bg-contrast text-on-contrast" : "border-label",
                           )}
                         >
-                          {units > 0 && "✓"}
+                          {units > 0 && <Check className="size-4" strokeWidth={3.5} />}
                         </span>
                       )
                     }
                   >
-                    <span className="text-[15px]">{p.name}</span>
+                    <span className="text-[16px]">{p.name}</span>
                   </Row>
                 );
               })}
@@ -343,18 +349,19 @@ export function BillAdmin({
             const p = participants.find((x) => x.personId === personSheet.id);
             if (!p) return null;
             return (
-              <div className="space-y-3 pt-2">
-                <div className="rounded-xl bg-surface p-4">
-                  <p className="tabular text-[15px]">
+              <div className="space-y-2.5">
+                <div className="mb-4 rounded-[24px] bg-surface p-5">
+                  <p className="tabular text-[15px] leading-[22px]">
                     这餐要付 <span className="font-semibold">{formatRM(p.owed)}</span>（item {formatRM(p.preTax)}）
                   </p>
-                  <div className="mt-1">
+                  <div className="mt-2">
                     <StatusChip status={p.status} remaining={p.remaining} />
                   </div>
                 </div>
                 {(iAmPayer || me.isAdmin) && p.owed > 0 && (
                   <Button
                     variant="filled"
+                    size="lg"
                     full
                     onClick={() => {
                       setPaySheet({ id: p.personId, name: p.name, remaining: p.remaining });
@@ -364,14 +371,12 @@ export function BillAdmin({
                     记录 {p.name} 付的钱
                   </Button>
                 )}
-                <Link
-                  href={`/people/${p.personId}`}
-                  className="press flex h-11 items-center justify-center rounded-[10px] bg-fill text-[15px] font-semibold"
-                >
+                <Link href={`/people/${p.personId}`} className={buttonClass("gray", "lg", true)}>
                   看 {p.name} 的全部账
                 </Link>
                 <Button
                   variant="danger"
+                  size="lg"
                   full
                   onClick={async () => {
                     try {

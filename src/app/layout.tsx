@@ -1,4 +1,10 @@
 import type { Metadata, Viewport } from "next";
+// 字体（免费、自己 host）：大标题 Bricolage Grotesque、正文 Instrument Sans、小标签 DM Mono、中文大标题 Noto Sans SC Black
+import "@fontsource-variable/bricolage-grotesque/opsz.css";
+import "@fontsource-variable/instrument-sans/wght.css";
+import "@fontsource/dm-mono/400.css";
+import "@fontsource/dm-mono/500.css";
+import "@fontsource/noto-sans-sc/900.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -14,8 +20,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f5f5f7" },
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f0f0f" },
   ],
 };
 

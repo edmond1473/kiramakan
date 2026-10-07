@@ -1,14 +1,15 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { unstable_rethrow } from "next/navigation";
 import { isSettled, type ChargeState } from "@/lib/ledger";
 import { formatRM } from "@/lib/money";
 import { allPairs, ledgerBetween, loadWorld, payeeInfo, type PayeeInfo } from "@/lib/server/world";
-import { Empty, Group, Money, Row, StatusChip, formatDate } from "@/components/ui";
+import { BigMoney, Empty, Group, Hero, Money, Row, StatusChip, formatDate } from "@/components/ui";
 import { SetupProblem } from "@/components/SetupProblem";
 import { PayCard } from "@/components/PayCard";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "我的账", robots: { index: false, follow: false } };
+export const viewport: Viewport = { themeColor: "#fff100" };
 
 interface Section {
   payee: PayeeInfo;
@@ -55,35 +56,43 @@ export default async function PersonalPage(props: PageProps<"/p/[token]">) {
       </main>
     );
   }
+  const total = data.sections.reduce((sum, s) => sum + s.balance, 0);
   return (
-    <div className="mx-auto min-h-dvh max-w-lg px-4 pb-12">
-      <header className="pt-6">
-        <p className="text-[13px] leading-[18px] font-medium text-label-2">KiraMakan</p>
-        <h1 className="mt-1 text-[28px] leading-[34px] font-bold tracking-[-0.01em]">{data.name} 的账</h1>
-      </header>
+    <div className="mx-auto min-h-dvh max-w-lg pb-12">
+      <Hero className="pt-[max(10px,env(safe-area-inset-top))]">
+        <div className="flex h-12 items-center">
+          <span className="display text-[20px] tracking-[-0.035em]">KiraMakan</span>
+        </div>
+        <h1 className="display mt-8 text-[46px] leading-[0.95] break-words">{data.name} 的账</h1>
+        {total > 0 && (
+          <>
+            <p className="label-mono mt-6">总共还欠</p>
+            <BigMoney cents={total} className="mt-2 text-[52px] leading-[0.9]" />
+          </>
+        )}
+      </Hero>
+      <div className="px-4">
       {data.sections.length === 0 ? (
         <Empty title="全部还清了 ✓">目前没有欠任何人。</Empty>
       ) : (
         data.sections.map((s) => (
-          <section key={s.payee.personId} className="mt-6">
-            <h2 className="px-4 text-[13px] leading-[18px] font-medium text-label-2">
+          <section key={s.payee.personId} className="mt-8">
+            <h2 className="label-mono px-1 text-label-2">
               欠 {s.payee.name} · <span className="tabular">{formatRM(s.balance)}</span>
             </h2>
-            <Group className="mt-1.5">
+            <Group className="mt-2.5">
               {s.open.map((c) => (
                 <Row
                   key={c.billId}
                   href={c.shareToken ? `/b/${c.shareToken}` : undefined}
                   chevron={!!c.shareToken}
-                  trailing={
-                    <div className="flex flex-col items-end">
-                      <Money cents={c.owed} className="text-[15px] font-semibold" />
-                      <StatusChip status={c.status} remaining={c.remaining} />
-                    </div>
-                  }
+                  trailing={<Money cents={c.owed} className="text-[16px] font-semibold" />}
                 >
-                  <p className="truncate text-[15px] leading-5 font-semibold">{c.title}</p>
+                  <p className="truncate text-[16px] leading-[21px] font-semibold">{c.title}</p>
                   <p className="mt-0.5 text-[13px] leading-[18px] text-label-2">{formatDate(c.billDate)}</p>
+                  <div className="mt-1.5">
+                    <StatusChip status={c.status} remaining={c.remaining} />
+                  </div>
                 </Row>
               ))}
             </Group>
@@ -93,6 +102,7 @@ export default async function PersonalPage(props: PageProps<"/p/[token]">) {
           </section>
         ))
       )}
+      </div>
     </div>
   );
 }

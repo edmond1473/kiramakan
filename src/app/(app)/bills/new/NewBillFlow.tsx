@@ -12,7 +12,7 @@ import { CrossCheckBanner } from "@/components/CrossCheckBanner";
 import { ItemsEditor } from "@/components/ItemsEditor";
 import { PeoplePicker } from "@/components/PeoplePicker";
 import { Button, Group, Notice, PageHeader, Row, Spinner } from "@/components/ui";
-import { toast } from "@/components/ui-client";
+import { selectClass, toast } from "@/components/ui-client";
 
 interface ReceiptDraftResponse {
   merchant: string | null;
@@ -92,7 +92,7 @@ export function NewBillFlow({
         setDraft(emptyDraft(today));
         setStep("review");
       } else {
-        setReadError(`${msg}。可以再拍一次，或手动输入。`);
+        setReadError(`${msg}。可以再拍一次、手动输入，或到「设定」按「检查 AI」看原因。`);
         setStep("photo");
       }
     }
@@ -163,31 +163,34 @@ export function NewBillFlow({
             <input ref={galleryRef} type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
 
             {step === "reading" ? (
-              <div className="mt-6 flex flex-col items-center rounded-xl bg-surface px-6 py-10 text-center">
+              <div className="grid-lines on-color mt-6 flex flex-col items-center rounded-[32px] px-6 py-10 text-center" aria-live="polite">
                 {image && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={image} alt="receipt" className="mb-5 max-h-56 rounded-lg object-contain" />
+                  <img src={image} alt="receipt" className="mb-6 max-h-56 rounded-[12px] object-contain ring-1 ring-black/10" />
                 )}
-                <Spinner className="size-6 text-tint" />
-                <p className="mt-3 text-[17px] leading-6 font-semibold">正在读 receipt…</p>
-                <p className="mt-1 text-[13px] leading-[18px] text-label-2">大概 10–20 秒</p>
+                <Spinner className="size-7" />
+                <p className="display mt-4 text-[30px]">正在读 receipt…</p>
+                <p className="mt-2 text-[14px] leading-5">两个 AI 一起读、互相比对，大概 10–20 秒</p>
               </div>
             ) : (
               <>
                 <button
                   type="button"
                   onClick={() => cameraRef.current?.click()}
-                  className="press mt-6 flex w-full flex-col items-center rounded-xl border-2 border-dashed border-separator bg-surface px-6 py-12 text-center active:bg-fill"
+                  className="press grid-lines on-color mt-6 flex w-full flex-col items-center rounded-[32px] px-6 pt-12 pb-11 text-center"
                 >
-                  <Camera className="size-10 text-tint" strokeWidth={1.5} aria-hidden />
-                  <span className="mt-3 text-[17px] leading-6 font-semibold">拍 receipt</span>
-                  <span className="mt-1 text-[13px] leading-[18px] text-label-2">平放、光线够、整张入镜</span>
+                  <span className="flex size-20 items-center justify-center rounded-full bg-ink text-volt">
+                    <Camera className="size-9" strokeWidth={2} aria-hidden />
+                  </span>
+                  <span className="display mt-6 text-[36px]">拍 receipt</span>
+                  <span className="mt-2 text-[14px] leading-5">平放、光线够、整张入镜</span>
                 </button>
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  <Button onClick={() => galleryRef.current?.click()}>
-                    <ImageUp className="size-[18px]" strokeWidth={1.75} /> 从相册选
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <Button full onClick={() => galleryRef.current?.click()}>
+                    <ImageUp className="size-[18px]" strokeWidth={2} /> 从相册选
                   </Button>
                   <Button
+                    full
                     onClick={() => {
                       setOcr(null);
                       setExtraItems([]);
@@ -195,7 +198,7 @@ export function NewBillFlow({
                       setStep("review");
                     }}
                   >
-                    <PencilLine className="size-[18px]" strokeWidth={1.75} /> 手动输入
+                    <PencilLine className="size-[18px]" strokeWidth={2} /> 手动输入
                   </Button>
                 </div>
                 {readError && (
@@ -212,10 +215,10 @@ export function NewBillFlow({
           <PageHeader title="核对 receipt" subtitle="AI 读的可能会错，对一下 item 和总额。" />
           <div className="px-4 pb-6">
             {image && (
-              <details className="mt-4 rounded-xl bg-surface px-4 py-3">
-                <summary className="cursor-pointer text-[15px] font-medium text-tint-text">看 receipt 照片</summary>
+              <details className="card mt-6 rounded-[24px] bg-surface px-5 py-4">
+                <summary className="label-mono cursor-pointer text-label">看 receipt 照片</summary>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={image} alt="receipt" className="mt-3 w-full rounded-lg" />
+                <img src={image} alt="receipt" className="mt-4 w-full rounded-[12px]" />
               </details>
             )}
             {ocr && (
@@ -255,9 +258,11 @@ export function NewBillFlow({
                 ))}
               </div>
             )}
-            <div className="mt-6 grid grid-cols-[auto_1fr] gap-3">
-              <Button onClick={() => setStep("photo")}>重拍</Button>
-              <Button variant="filled" onClick={goPeople}>
+            <div className="mt-8 grid grid-cols-[auto_1fr] gap-2">
+              <Button size="lg" onClick={() => setStep("photo")}>
+                重拍
+              </Button>
+              <Button variant="filled" size="lg" onClick={goPeople}>
                 下一步：谁有吃
               </Button>
             </div>
@@ -275,15 +280,23 @@ export function NewBillFlow({
                     setPayerId(p.id);
                     setSelected((s) => new Set([...s, p.id]));
                   }}
-                  trailing={payerId === p.id ? <Check className="size-5 text-tint" strokeWidth={2.5} /> : null}
+                  trailing={
+                    payerId === p.id ? (
+                      <span className="flex size-[26px] items-center justify-center rounded-full bg-contrast text-on-contrast">
+                        <Check className="size-4" strokeWidth={3.5} aria-label="已选" />
+                      </span>
+                    ) : (
+                      <span className="block size-[26px] rounded-full border-2 border-label-3" />
+                    )
+                  }
                 >
-                  <span className="text-[15px]">{p.id === me.personId ? `我（${p.name}）` : p.name}</span>
+                  <span className="text-[16px] font-semibold">{p.id === me.personId ? `我（${p.name}）` : p.name}</span>
                 </Row>
               ))}
               {people.some((p) => !payers.includes(p)) && (
                 <div className="row px-4">
-                  <div className="row-sep flex min-h-[44px] items-center gap-3 border-b border-separator py-2">
-                    <span className="flex-1 text-[15px] text-label-2">别的朋友付的</span>
+                  <div className="row-sep flex min-h-[60px] items-center gap-3 border-b border-separator py-2.5 pr-4">
+                    <span className="min-w-0 flex-1 text-[16px] whitespace-nowrap text-label-2">别的朋友付的</span>
                     <select
                       aria-label="别的朋友付的"
                       value={payers.some((p) => p.id === payerId) ? "" : payerId}
@@ -292,7 +305,7 @@ export function NewBillFlow({
                         setPayerId(e.target.value);
                         setSelected((s) => new Set([...s, e.target.value]));
                       }}
-                      className="h-9 rounded-lg bg-fill px-2 text-[15px]"
+                      className={selectClass("h-11 w-36 shrink-0 text-[15px]")}
                     >
                       <option value="">选…</option>
                       {people
@@ -308,8 +321,8 @@ export function NewBillFlow({
               )}
             </Group>
 
-            <section className="mt-6">
-              <h2 className="mb-2 px-4 text-[13px] leading-[18px] font-medium text-label-2">谁有一起吃（点名字选）</h2>
+            <section className="mt-8">
+              <h2 className="label-mono mb-2.5 px-1 text-label-2">谁有一起吃（点名字选）</h2>
               <PeoplePicker
                 people={[...people, ...newNames.map((n) => ({ id: `new:${n}`, name: n }))]}
                 selected={new Set([...selected, ...newNames.map((n) => `new:${n}`)])}
@@ -335,14 +348,14 @@ export function NewBillFlow({
                   if (!newNames.some((x) => x.toLowerCase() === n.toLowerCase())) setNewNames((xs) => [...xs, n]);
                 }}
               />
-              <p className="mt-2 px-1 text-[12px] leading-4 text-label-2">
-                漏了也没关系，朋友开 link 时可以自己加名字。
-              </p>
+              <p className="mt-2.5 px-1 text-[12px] leading-[17px] text-label-2">漏了也没关系，朋友开 link 时可以自己加名字。</p>
             </section>
 
-            <div className="mt-6 grid grid-cols-[auto_1fr] gap-3">
-              <Button onClick={() => setStep("review")}>上一步</Button>
-              <Button variant="filled" loading={saving} onClick={save}>
+            <div className="mt-8 grid grid-cols-[auto_1fr] gap-2">
+              <Button size="lg" onClick={() => setStep("review")}>
+                上一步
+              </Button>
+              <Button variant="filled" size="lg" loading={saving} onClick={save}>
                 建立账单
               </Button>
             </div>

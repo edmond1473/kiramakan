@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { classifyHttp, summarizeAttempts, failureText, type Failure } from "../ai-errors";
 import { rmToCents } from "../money";
 import { checkDraft } from "../receipt";
 import {
@@ -108,7 +109,8 @@ function providers(): ProviderConf[] {
       label: "Gemini",
       url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
       key: env.GEMINI_API_KEY,
-      models: list(env.GEMINI_MODEL) ?? ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-2.5-flash"],
+      // 3.8 Flash 读得最准，但免费版每天次数很少；用完就换免费次数多很多的 3.5 Flash-Lite
+      models: list(env.GEMINI_MODEL) ?? ["gemini-3.8-flash", "gemini-3.5-flash-lite"],
       formats: ["json_schema", "json_object", "none"],
     },
     {
@@ -116,7 +118,8 @@ function providers(): ProviderConf[] {
       label: "DeepSeek",
       url: "https://api.deepseek.com/chat/completions",
       key: env.DEEPSEEK_API_KEY,
-      models: list(env.DEEPSEEK_MODEL) ?? ["deepseek-v4-flash-vision-exp", "deepseek-flash"],
+      // deepseek-flash 可以读图；旧名字 deepseek-v4-flash-vision-exp 已退役但暂时还接受
+      models: list(env.DEEPSEEK_MODEL) ?? ["deepseek-flash", "deepseek-v4-flash-vision-exp"],
       formats: ["json_object", "none"],
       extra: { max_tokens: 4096 },
     },
@@ -184,9 +187,16 @@ function toResult(conf: ProviderConf, model: string, raw: z.infer<typeof RawSche
 
 class ProviderError extends Error {}
 
-/** 一家 AI：按顺序试模型和 JSON 格式，哪个能用就用哪个 */
+type Attempt = Failure & { model: string };
+
+function logFailure(conf: ProviderConf, model: string, format: string, f: Failure) {
+  // 写进 Vercel 的 log：方便查哪个模型、为什么失败（不会记录 key 或照片）
+  console.error(`[ocr] ${conf.id} ${model} (${format}) ${f.kind}${f.status ? ` HTTP ${f.status}` : ""}${f.detail ? `: ${f.detail}` : ""}`);
+}
+
+/** 一家 AI：按顺序试模型和 JSON 格式，哪个能用就用哪个；全部失败就说清楚每个模型的原因 */
 async function readWith(conf: ProviderConf, imageDataUrl: string): Promise<ReadResult> {
-  let last = "没有可用的模型";
+  const attempts: Attempt[] = [];
   for (const model of conf.models) {
     for (const format of conf.formats) {
       const body: Record<string, unknown> = {
@@ -220,39 +230,164 @@ async function readWith(conf: ProviderConf, imageDataUrl: string): Promise<ReadR
           signal: AbortSignal.timeout(45_000),
         });
       } catch (e) {
-        throw new ProviderError(e instanceof Error && e.name === "TimeoutError" ? "太久没回应" : "连不上");
+        const f: Failure = { kind: e instanceof Error && e.name === "TimeoutError" ? "timeout" : "network" };
+        logFailure(conf, model, format, f);
+        throw new ProviderError(failureText(f));
       }
       if (!res.ok) {
-        const text = (await res.text()).slice(0, 400);
-        last = `服务出错（HTTP ${res.status}）`;
-        if (res.status === 401 || res.status === 403 || /api[_ ]?key|invalid_api_key|authenticat/i.test(text)) {
-          throw new ProviderError("API key 无效或没有权限");
-        }
-        if (res.status === 402) throw new ProviderError("余额不够");
-        if (res.status === 429) {
-          last = "用量到上限了";
-          break; // 换下一个模型（各模型额度分开）
-        }
-        if (/response_format|json_schema|schema|json_object|structured/i.test(text)) continue; // 换一种 JSON 格式
-        if (res.status === 404 || /model/i.test(text)) break; // 换下一个模型
-        if (res.status >= 500) break;
-        continue;
+        const f = classifyHttp(res.status, (await res.text()).slice(0, 2000));
+        logFailure(conf, model, format, f);
+        attempts.push({ ...f, model });
+        if (f.kind === "key" || f.kind === "balance") throw new ProviderError(summarizeAttempts(attempts));
+        if (f.kind === "format" || f.kind === "rejected") continue; // 换一种 JSON 格式再试
+        break; // 次数用完 / 模型不能用 / 服务出错：换下一个模型（各模型额度分开）
       }
       const data = (await res.json().catch(() => null)) as { choices?: { message?: { content?: string | null } }[] } | null;
       const content = data?.choices?.[0]?.message?.content;
       if (!content || !content.trim()) {
-        last = "回传空白";
+        attempts.push({ kind: "empty", model });
+        logFailure(conf, model, format, { kind: "empty" });
         continue; // DeepSeek 文件说 JSON 模式偶尔会回空白：换个格式再试
       }
       try {
         return toResult(conf, model, RawSchema.parse(extractJson(content)));
       } catch {
-        last = "回传的格式看不懂";
+        attempts.push({ kind: "unreadable", model });
+        logFailure(conf, model, format, { kind: "unreadable" });
         continue;
       }
     }
   }
-  throw new ProviderError(last);
+  throw new ProviderError(summarizeAttempts(attempts));
+}
+
+// ---------- 「检查 AI」：看 key 有没有效、每个模型能不能用、DeepSeek 余额 ----------
+
+export interface ModelCheck {
+  model: string;
+  ok: boolean;
+  text: string;
+}
+
+export interface ProviderCheck {
+  id: ProviderId;
+  label: string;
+  configured: boolean;
+  /** 至少一个模型能用 */
+  ok: boolean;
+  message: string;
+  models: ModelCheck[];
+  balance?: { available: boolean; text: string } | null;
+}
+
+async function pingModel(conf: ProviderConf, model: string): Promise<{ ok: true } | { ok: false; failure: Failure }> {
+  try {
+    const res = await fetch(conf.url, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${conf.key}` },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content: "Reply with the single word OK." }],
+        ...(conf.id === "gemini" ? {} : { max_tokens: 8 }),
+      }),
+      signal: AbortSignal.timeout(25_000),
+    });
+    if (res.ok) return { ok: true };
+    const failure = classifyHttp(res.status, (await res.text()).slice(0, 2000));
+    logFailure(conf, model, "check", failure);
+    return { ok: false, failure };
+  } catch (e) {
+    return { ok: false, failure: { kind: e instanceof Error && e.name === "TimeoutError" ? "timeout" : "network" } };
+  }
+}
+
+async function deepseekBalance(conf: ProviderConf): Promise<{ available: boolean; text: string } | null> {
+  try {
+    const res = await fetch("https://api.deepseek.com/user/balance", {
+      headers: { authorization: `Bearer ${conf.key}` },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) return null;
+    const j = (await res.json()) as {
+      is_available?: boolean;
+      balance_infos?: { currency?: string; total_balance?: string; granted_balance?: string; topped_up_balance?: string }[];
+    };
+    const lines = (j.balance_infos ?? []).map(
+      (b) => `${b.currency ?? ""} ${b.total_balance ?? "0"}（充值 ${b.topped_up_balance ?? "0"}，赠送 ${b.granted_balance ?? "0"}）`.trim(),
+    );
+    return { available: !!j.is_available, text: lines.join("；") || "0" };
+  } catch {
+    return null;
+  }
+}
+
+/** 每个有设 key 的 AI：每个模型发一个很短的测试请求（每个模型会用掉 1 次额度） */
+export async function checkProviders(): Promise<ProviderCheck[]> {
+  if (process.env.OCR_MOCK) return mockChecks();
+  const all = providers().filter((p) => p.id !== "openai" || p.key);
+  return Promise.all(
+    all.map(async (conf): Promise<ProviderCheck> => {
+      const envName = `${conf.id.toUpperCase()}_API_KEY`;
+      if (!conf.key) {
+        return { id: conf.id, label: conf.label, configured: false, ok: false, message: `还没设定 ${envName}`, models: [] };
+      }
+      const balance = conf.id === "deepseek" ? await deepseekBalance(conf) : null;
+      const models: ModelCheck[] = [];
+      let fatal: Failure | null = null;
+      for (const model of conf.models) {
+        if (fatal) {
+          models.push({ model, ok: false, text: failureText(fatal) });
+          continue;
+        }
+        const r = await pingModel(conf, model);
+        if (r.ok) models.push({ model, ok: true, text: "能用 ✓" });
+        else {
+          models.push({ model, ok: false, text: failureText(r.failure) });
+          if (r.failure.kind === "key" || r.failure.kind === "balance") fatal = r.failure;
+        }
+      }
+      const ok = models.some((m) => m.ok);
+      const message = ok
+        ? models.every((m) => m.ok)
+          ? "全部能用"
+          : "有模型能用；不能用的会自动跳过"
+        : fatal?.kind === "key"
+          ? `${envName} 无效或没有权限，请检查 Vercel 的环境变数`
+          : fatal?.kind === "balance"
+            ? "帐号没有余额：到 platform.deepseek.com 充值，或确认这个 key 是在有余额的帐号开的"
+            : "全部模型都不能用，看下面每个模型的原因";
+      return { id: conf.id, label: conf.label, configured: true, ok, message, models, balance };
+    }),
+  );
+}
+
+function mockChecks(): ProviderCheck[] {
+  return [
+    {
+      id: "gemini",
+      label: "Gemini",
+      configured: true,
+      ok: true,
+      message: "有模型能用；不能用的会自动跳过（测试资料）",
+      models: [
+        { model: "gemini-3.8-flash", ok: false, text: failureText({ kind: "quota", status: 429 }) },
+        { model: "gemini-3.5-flash-lite", ok: true, text: "能用 ✓" },
+      ],
+      balance: null,
+    },
+    {
+      id: "deepseek",
+      label: "DeepSeek",
+      configured: true,
+      ok: false,
+      message: "帐号没有余额：到 platform.deepseek.com 充值，或确认这个 key 是在有余额的帐号开的（测试资料）",
+      models: [
+        { model: "deepseek-flash", ok: false, text: failureText({ kind: "balance", status: 402 }) },
+        { model: "deepseek-v4-flash-vision-exp", ok: false, text: failureText({ kind: "balance", status: 402 }) },
+      ],
+      balance: { available: false, text: "CNY 0.00（充值 0.00，赠送 0.00）" },
+    },
+  ];
 }
 
 /** 主入口：有设 key 的 AI 同时读，再互相比对 */
@@ -287,9 +422,9 @@ export async function readReceipt(imageDataUrl: string): Promise<ReceiptDraft> {
 
   const picked = crossCheck(outcomes, PROVIDER_ORDER);
   if (!picked) {
-    const why = outcomes.map((o) => `${o.label}：${o.error ?? "失败"}`).join("；");
+    const why = outcomes.map((o) => `${o.label}：${o.error ?? "失败"}`).join("。");
     const who = outcomes.length === 2 ? "两个 AI 都" : outcomes.length > 2 ? "几个 AI 都" : "";
-    throw new Error(`${who}读不到这张 receipt（${why}）`);
+    throw new Error(`${who}读不到这张 receipt。${why}`);
   }
   const r = picked.chosen;
   return {

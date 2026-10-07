@@ -7,8 +7,9 @@ import { api } from "@/lib/client/api";
 import { decodeQrFromFile } from "@/lib/client/qr";
 import { inspectEmv } from "@/lib/emvqr";
 import { QrCode } from "@/components/QrCode";
-import { Button, Group, Notice, PageHeader, Row } from "@/components/ui";
-import { Field, Sheet, toast } from "@/components/ui-client";
+import { Button, Group, Notice, PageHeader, Row, Tag } from "@/components/ui";
+import { Field, Sheet, selectClass, toast } from "@/components/ui-client";
+import { AiCheck } from "./AiCheck";
 
 export function Settings({
   me,
@@ -67,7 +68,7 @@ export function Settings({
       <PageHeader title="设定" />
       <div className="px-4">
         <Group title="我的资料">
-          <div className="space-y-4 p-4">
+          <div className="space-y-5 p-5">
             <Field label="名字（朋友看到的）" value={name} onChange={(e) => setName(e.target.value)} />
             <Field
               label="TNG 名字"
@@ -86,6 +87,7 @@ export function Settings({
             />
             <Button
               variant="tinted"
+              size="lg"
               full
               loading={savingProfile}
               onClick={async () => {
@@ -108,23 +110,27 @@ export function Settings({
           title="TNG 收款 QR"
           footer="在 TNG 打开「收款 / Receive」截图，上传那张截图就可以。朋友付款画面会显示这个 QR。"
         >
-          <div className="flex flex-col items-center p-4">
+          <div className="flex flex-col items-center p-5">
             {me.qrPayload ? (
               <>
-                <QrCode payload={me.qrPayload} size={168} label="你的收款 QR" />
-                <p className="mt-2 text-[12px] leading-4 text-label-2">
-                  {info?.isEmv ? (info.isDuitNow ? "DuitNow QR" : "EMV QR") : "QR 已读取"}
-                  {info?.merchantName && ` · ${info.merchantName}`}
-                </p>
+                <QrCode payload={me.qrPayload} size={176} label="你的收款 QR" />
+                <div className="mt-3">
+                  <Tag tone="mist">
+                    {info?.isEmv ? (info.isDuitNow ? "DuitNow QR" : "EMV QR") : "QR 已读取"}
+                    {info?.merchantName && ` · ${info.merchantName}`}
+                  </Tag>
+                </div>
               </>
             ) : (
-              <div className="flex flex-col items-center py-4 text-label-3">
-                <QrIcon className="size-11" strokeWidth={1.5} />
-                <p className="mt-2 text-[14px] text-label-2">还没上传</p>
+              <div className="flex flex-col items-center py-4">
+                <span className="flex size-16 items-center justify-center rounded-full bg-volt text-ink">
+                  <QrIcon className="size-8" strokeWidth={2} />
+                </span>
+                <p className="mt-3 text-[15px] text-label-2">还没上传</p>
               </div>
             )}
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onQrFile(e.target.files?.[0])} />
-            <Button className="mt-3" variant="filled" loading={qrBusy} onClick={() => fileRef.current?.click()}>
+            <Button className="mt-5" variant="filled" full loading={qrBusy} onClick={() => fileRef.current?.click()}>
               {me.qrPayload ? "换一张 QR 截图" : "上传 QR 截图"}
             </Button>
           </div>
@@ -141,7 +147,7 @@ export function Settings({
                 <span
                   role="switch"
                   aria-checked={me.qrAmountEnabled}
-                  className={`relative inline-flex h-[31px] w-[51px] rounded-full transition-colors ${me.qrAmountEnabled ? "bg-green" : "bg-fill-2"}`}
+                  className={`relative inline-flex h-[31px] w-[51px] rounded-full transition-colors ${me.qrAmountEnabled ? "bg-forest" : "bg-fill-2"}`}
                 >
                   <span
                     className={`absolute top-[2px] size-[27px] rounded-full bg-white shadow transition-transform ${me.qrAmountEnabled ? "translate-x-[22px]" : "translate-x-[2px]"}`}
@@ -149,19 +155,21 @@ export function Settings({
                 </span>
               }
             >
-              <span className="text-[15px]">QR 带金额</span>
+              <span className="text-[16px]">QR 带金额</span>
             </Row>
           </Group>
         )}
 
+        <AiCheck />
+
         <Group title="帐号" footer={`登入名：${me.username}`}>
           <Row onClick={() => setPwOpen(true)} chevron>
-            <span className="text-[15px]">改密码</span>
+            <span className="text-[16px]">改密码</span>
           </Row>
           {me.isAdmin && (
             <Row onClick={() => setAccOpen(true)} chevron>
-              <p className="text-[15px]">帮另一个付钱的人开帐号</p>
-              <p className="text-[12px] leading-4 text-label-2">
+              <p className="text-[16px]">帮另一个付钱的人开帐号</p>
+              <p className="mt-0.5 text-[12px] leading-4 text-label-2">
                 {payers.length > 1 ? `已有：${payers.map((p) => p.name).join("、")}` : "例如常常跟你轮流付钱的朋友"}
               </p>
             </Row>
@@ -172,14 +180,14 @@ export function Settings({
               router.replace("/login");
               router.refresh();
             }}
-            leading={<LogOut className="size-5 text-red-text" strokeWidth={1.75} />}
+            leading={<LogOut className="size-5 text-red-text" strokeWidth={2} />}
           >
-            <span className="text-[15px] text-red-text">登出</span>
+            <span className="text-[16px] text-red-text">登出</span>
           </Row>
         </Group>
 
         <Group title="快要来">
-          <div className="p-4 text-[14px] leading-5 text-label-2">
+          <div className="p-5 text-[14px] leading-[21px] text-label-2">
             自动对账：TNG 收到钱的通知会自动打勾、抓出谁忘了给 tax；每星期上传 TNG 交易记录 PDF 补漏。
           </div>
         </Group>
@@ -229,7 +237,7 @@ function PasswordSheet({ open, onClose }: { open: boolean; onClose: () => void }
         </Button>
       }
     >
-      <div className="space-y-4 pt-2">
+      <div className="space-y-5">
         <Field label="现在的密码" type="password" value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" />
         <Field label="新密码" type="password" value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" hint="最少 6 个字" />
         {error && <Notice tone="error">{error}</Notice>}
@@ -285,18 +293,14 @@ function AccountSheet({
         </Button>
       }
     >
-      <div className="space-y-4 pt-2">
+      <div className="space-y-5">
         <p className="text-[14px] leading-5 text-label-2">
           他登入后可以自己新增他付的单、上传他的 TNG 收款 QR、记录朋友还他的钱。
         </p>
         {friends.length > 0 && (
           <label className="block">
-            <span className="mb-1.5 block px-1 text-[13px] font-medium text-label-2">已经在朋友名单里？</span>
-            <select
-              value={personId}
-              onChange={(e) => setPersonId(e.target.value)}
-              className="h-11 w-full rounded-[10px] border border-separator bg-surface px-3 text-[16px]"
-            >
+            <span className="label-mono mb-2 block px-1 text-label-2">已经在朋友名单里？</span>
+            <select value={personId} onChange={(e) => setPersonId(e.target.value)} className={selectClass("w-full")}>
               <option value="">不是，新的人</option>
               {friends.map((f) => (
                 <option key={f.id} value={f.id}>

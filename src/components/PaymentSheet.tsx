@@ -81,7 +81,7 @@ function PaymentSheetInner({ onClose, from, to, suggestedCents, onSaved }: Props
         </Button>
       }
     >
-      <div className="space-y-4 pt-2">
+      <div className="space-y-5">
         <Field
           label="收到多少（RM）"
           inputMode="decimal"
@@ -89,7 +89,7 @@ function PaymentSheetInner({ onClose, from, to, suggestedCents, onSaved }: Props
           onChange={(e) => setAmount(e.target.value)}
           placeholder="0.00"
           autoFocus
-          className="[&_input]:tabular [&_input]:text-[22px] [&_input]:font-semibold"
+          className="[&_input]:tabular [&_input]:h-14 [&_input]:text-[24px] [&_input]:font-semibold"
           hint={suggestedCents > 0 ? `目前欠 ${formatRM(suggestedCents)}` : undefined}
         />
         {verdict && <Notice tone={tone}>{verdict.message}</Notice>}

@@ -32,8 +32,8 @@
 
 ### 2. 读 receipt 的 AI key
 
-- **Gemini（免费）**：到 [Google AI Studio](https://aistudio.google.com/apikey) → Create API key，这就是 `GEMINI_API_KEY`。免费版不用信用卡。
-- **DeepSeek**：到 [platform.deepseek.com](https://platform.deepseek.com) → API keys → Create，这就是 `DEEPSEEK_API_KEY`。用你已经充值的余额，每张 receipt 不到 1 sen。
+- **Gemini（免费）**：到 [Google AI Studio](https://aistudio.google.com/apikey) → Create API key，这就是 `GEMINI_API_KEY`。免费版不用信用卡。先用 `gemini-3.8-flash`（最准，但免费版每天次数很少），次数用完会自动换 `gemini-3.5-flash-lite`（免费次数多很多）。
+- **DeepSeek**：到 [platform.deepseek.com](https://platform.deepseek.com) → API keys → Create，这就是 `DEEPSEEK_API_KEY`。**key 一定要在有余额的那个帐号开**，不然会显示「帐号没有余额」。每张 receipt 不到 1 sen。
 - OpenAI 可以不用。有设 `OPENAI_API_KEY` 的话会变成第三个一起比对。
 
 只设其中一个也能用，只是没有另一个 AI 互相检查。一个都没设的话，读 receipt 会失败，要手动输入 item。
@@ -84,14 +84,15 @@ vercel --prod
 | `GEMINI_API_KEY` | 建议 | Google AI Studio 的免费 key |
 | `DEEPSEEK_API_KEY` | 建议 | DeepSeek 的 key |
 | `OPENAI_API_KEY` | 否 | 有的话变成第三个一起比对 |
-| `GEMINI_MODEL` / `DEEPSEEK_MODEL` / `OPENAI_MODEL` | 否 | 指定模型（可以用逗号列几个，按顺序试）。没设会用默认：Gemini `gemini-3.8-flash` → `gemini-3.5-flash` → `gemini-2.5-flash`；DeepSeek `deepseek-v4-flash-vision-exp` → `deepseek-flash`；OpenAI `gpt-6-luna` → `gpt-5.4-mini` → `gpt-5-mini` |
+| `GEMINI_MODEL` / `DEEPSEEK_MODEL` / `OPENAI_MODEL` | 否 | 指定模型（可以用逗号列几个，按顺序试）。没设会用默认：Gemini `gemini-3.8-flash` → `gemini-3.5-flash-lite`；DeepSeek `deepseek-flash` → `deepseek-v4-flash-vision-exp`；OpenAI `gpt-6-luna` → `gpt-5.4-mini` → `gpt-5-mini` |
 | `SESSION_SECRET` | 否 | 登入 cookie 的签名密钥。没设会自动产生并存在资料库 |
 | `CRON_SECRET` | 否 | 设了的话，每天的自动 ping 要带这个密钥（Vercel 会自动带） |
 | `OCR_MOCK` | 否 | 本机测试用假资料：`1` 两个 AI 读得不一样、`agree` 一样、`single` 只有一个读到、`extra` 另一个多读到一个 item |
 
 ## 要知道的限制
 
-- **DeepSeek 读图还是实验功能**（`deepseek-v4-flash-vision-exp`），每张图片最多只用 384 个 token，长 receipt 的小字可能读不清楚。所以才让 Gemini 一起读，互相检查。
+- **DeepSeek 读图**（`deepseek-flash`）每张图片用的 token 有上限，长 receipt 的小字可能读不清楚。所以才让 Gemini 一起读，互相检查。
+- **Gemini 免费版有每日次数**：3.8 Flash 每天只有很少次，用完会自动换 3.5 Flash-Lite；两个都用完就要等第二天，或在 Google AI Studio 开启付费。
 - **Gemini 免费版的资料 Google 可能拿去改进模型**。receipt 上只有餐厅和 item，一般没关系；介意的话可以在 Google AI Studio 开启付费。免费版每天的次数上限对几个人吃饭绰绰有余。
 - 两个 AI 读得一样，也不代表一定对（例如两个都把 8 看成 3）。所以「加起来要等于总额」那一关一定要过，总额也请自己看一眼 receipt。
 - **「QR 带金额」是实验功能**，默认关闭。TNG 不一定接受自己加进去的金额，请先叫一个朋友扫扫看，金额有自动出现才在设定里打开。
@@ -99,18 +100,33 @@ vercel --prod
 - 付款记录是「人对人」的余额，不是绑某一餐：还款会先还最早的一餐（FIFO）。删掉一张单不会删掉已记录的付款。
 - Phase 2 还没做：TNG 进账通知自动对账、每星期上传 TNG 交易记录 PDF 补漏。
 
+## 读不到 receipt 怎么办
+
+先到「设定」→「读 receipt 的 AI」按「检查 AI」，会显示两个 key 有没有效、每个模型能不能用、DeepSeek 余额。每个模型失败的原因也会写进 Vercel 的 log（Vercel → 项目 → Logs，搜 `[ocr]`）。
+
+| 显示 | 原因 | 怎么办 |
+| --- | --- | --- |
+| 帐号没有余额 | DeepSeek 这个 key 所在的帐号没钱（HTTP 402） | 到 platform.deepseek.com 看余额、充值；钱充在别的帐号的话，用那个帐号开 key |
+| 次数到上限了 | Gemini 免费版今天的次数用完（HTTP 429） | 等明天，或在 Google AI Studio 开启付费 |
+| 这个模型不能用 | 模型已停用或名字不对（HTTP 404） | 不用理，会自动跳过；全部不能用的话在 Vercel 设 `GEMINI_MODEL` / `DEEPSEEK_MODEL` 换模型 |
+| API key 无效或没有权限 | key 贴错、多了空格，或被删掉 | 重新复制 key，到 Vercel → Settings → Environment Variables 改好，再 Redeploy |
+
+改了 Vercel 的环境变数一定要 **Redeploy** 才会生效。
+
 ## 本机开发
 
 ```bash
 npm install
 cp .env.example .env.local   # 填 DATABASE_URL（本机 Postgres 或 Supabase 都可以）
 npm run dev                  # http://localhost:3000
-npm test                     # 金额计算、对账、两个 AI 比对、QR 的单元测试
+npm test                     # 金额计算、对账、两个 AI 比对、AI 出错处理、QR 的单元测试
 ```
 
 ## 技术
 
 Next.js 16（App Router）、Postgres（postgres.js）、Gemini / DeepSeek / OpenAI 的 OpenAI 兼容 API（读图 + JSON）、Tailwind CSS v4。金额全部用 integer cents 计算，摊分用 largest remainder method，保证每个人的金额加起来刚好等于 receipt 总额。
+
+介面风格参考 ManyChat：白底配近黑字，重点用整块的亮黄 / 洋红 / 靛蓝 / 深绿，胶囊按钮、大圆角卡片、没有阴影，小标签用全大写等宽字。颜色和字体 token 都在 `src/app/globals.css`，基本组件在 `src/components/ui.tsx`。字体全部免费、自己 host（npm `@fontsource`）：Bricolage Grotesque（大标题）、Instrument Sans（正文）、DM Mono（小标签）、Noto Sans SC Black（中文大标题，只会下载用到的字）。
 
 主要程序：
 
@@ -119,5 +135,6 @@ Next.js 16（App Router）、Postgres（postgres.js）、Gemini / DeepSeek / Ope
 - `src/lib/receipt.ts`：核对画面的检查（加起来要等于总额）
 - `src/lib/ledger.ts`：欠款账本、FIFO、忘了 tax 的判断
 - `src/lib/emvqr.ts`：DuitNow / EMV QR 解析和加金额
-- `src/lib/server/ocr.ts`：读 receipt 的 prompt、各家 API 的接法
+- `src/lib/server/ocr.ts`：读 receipt 的 prompt、各家 API 的接法、「检查 AI」
+- `src/lib/ai-errors.ts`：把各家 API 的错误变成看得懂的原因
 - `src/lib/server/db.ts`：资料表（第一次连线自动建立）

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Check, Plus } from "lucide-react";
 import { cx } from "./ui";
 
-/** 选谁有一起吃：点名字切换，可以直接打新名字加进去 */
+/** 选谁有一起吃：点名字切换（选了变黑色胶囊），可以直接打新名字加进去 */
 export function PeoplePicker({
   people,
   selected,
@@ -39,12 +39,12 @@ export function PeoplePicker({
               disabled={isLocked}
               onClick={() => onToggle(p.id)}
               className={cx(
-                "press inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[15px] font-medium transition-colors",
-                on ? "bg-tint-fill text-white" : "bg-surface text-label",
+                "press inline-flex h-11 items-center gap-1.5 rounded-full px-4 text-[15px] font-semibold transition-colors",
+                on ? "bg-contrast text-on-contrast" : "bg-surface text-label",
                 isLocked && "opacity-80",
               )}
             >
-              {on && <Check className="size-4" strokeWidth={2.5} />}
+              {on && <Check className="size-4" strokeWidth={3} />}
               {p.name}
             </button>
           );
@@ -62,15 +62,15 @@ export function PeoplePicker({
           }}
           placeholder="新朋友的名字"
           aria-label="新朋友的名字"
-          className="h-11 min-w-0 flex-1 rounded-[10px] border border-separator bg-surface px-3.5 text-[16px] outline-none placeholder:text-label-3 focus:border-tint"
+          className="h-12 min-w-0 flex-1 rounded-[12px] border-[1.5px] border-transparent bg-field px-4 text-[16px] outline-none placeholder:text-label-3 focus:border-label"
         />
         <button
           type="button"
           onClick={add}
           disabled={!name.trim()}
-          className="press inline-flex h-11 items-center gap-1 rounded-[10px] bg-tint-soft px-4 text-[15px] font-semibold text-tint-text disabled:opacity-40"
+          className="press inline-flex h-12 items-center gap-1.5 rounded-full bg-contrast px-5 font-mono text-[14px] font-medium tracking-[0.05em] text-on-contrast uppercase disabled:opacity-35"
         >
-          <Plus className="size-4" strokeWidth={2.5} /> 加
+          <Plus className="size-4" strokeWidth={2.75} /> 加
         </button>
       </div>
     </div>

@@ -18,7 +18,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
     return <SetupProblem error={e} />;
   }
   return (
-    <div className="mx-auto min-h-dvh max-w-lg pb-[calc(76px+env(safe-area-inset-bottom))]">
+    <div className="mx-auto min-h-dvh max-w-lg pb-[calc(104px+env(safe-area-inset-bottom))]">
       {children}
       <TabBar />
       <Toaster />

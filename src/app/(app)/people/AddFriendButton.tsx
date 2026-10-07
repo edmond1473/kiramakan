@@ -35,7 +35,7 @@ export function AddFriendButton() {
   return (
     <>
       <Button variant="filled" size="sm" onClick={() => setOpen(true)}>
-        <UserPlus className="size-4" strokeWidth={2} /> 加朋友
+        <UserPlus className="size-4" strokeWidth={2.25} /> 加朋友
       </Button>
       <Sheet
         open={open}
@@ -47,7 +47,7 @@ export function AddFriendButton() {
           </Button>
         }
       >
-        <div className="space-y-4 pt-2">
+        <div className="space-y-5">
           <Field label="名字（大家叫他的名字）" value={name} onChange={(e) => setName(e.target.value)} placeholder="例如 Ali" autoFocus />
           <Field
             label="TNG 名字（可以不填）"
