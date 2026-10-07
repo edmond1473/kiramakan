@@ -145,7 +145,14 @@ create table if not exists app_settings (
 `;
 
 async function ensureSchema(sql: postgres.Sql): Promise<void> {
+  // 表已经建好就不用再抢锁（serverless 每次冷启动都会跑到这里）
+  const [{ ready }] = await sql`select to_regclass('public.app_settings') is not null as ready`;
+  if (ready) return;
   await sql.begin(async (tx) => {
+    // 卡住的连接不要把整个 function 拖到 300 秒 timeout，宁可快点报错
+    await tx`set local lock_timeout = '10s'`;
+    await tx`set local statement_timeout = '30s'`;
+    await tx`set local idle_in_transaction_session_timeout = '30s'`;
     await tx`select pg_advisory_xact_lock(727101)`;
     await tx.unsafe(SCHEMA);
   });
