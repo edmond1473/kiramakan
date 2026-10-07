@@ -8,10 +8,13 @@ const g = globalThis as unknown as {
 };
 
 function makeClient(): postgres.Sql {
-  const url = process.env.DATABASE_URL;
+  let url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error("还没设定 DATABASE_URL（Supabase 的 Postgres 连接字符串）");
   }
+  // Supabase pooler 的 transaction mode（6543）遇到 postgres.js 同一连接上排队的多个查询会卡死，
+  // 改走同一个 host 的 session mode（5432）
+  url = url.replace(/(\.pooler\.supabase\.com):6543\//, "$1:5432/");
   const host = (() => {
     try {
       return new URL(url).hostname;
