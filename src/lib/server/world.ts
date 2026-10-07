@@ -1,4 +1,5 @@
 import "server-only";
+import type postgres from "postgres";
 import { allocateBill, type Allocation } from "../money";
 import {
   buildLedger,
@@ -98,8 +99,9 @@ function groupBy<T, K>(rows: T[], key: (r: T) => K): Map<K, T[]> {
   return m;
 }
 
-export async function loadWorld(): Promise<World> {
-  const sql = await db();
+/** q：在 transaction 里读的话传 tx 进来（不要另外占一条连线） */
+export async function loadWorld(q?: postgres.Sql | postgres.TransactionSql): Promise<World> {
+  const sql = q ?? (await db());
   const [people, bills, items, charges, parts, shares, payments] = await Promise.all([
     sql`
       select p.id, p.name, p.tng_name, p.phone, p.token, p.is_active,

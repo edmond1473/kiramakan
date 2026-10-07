@@ -8,13 +8,10 @@ const g = globalThis as unknown as {
 };
 
 function makeClient(): postgres.Sql {
-  let url = process.env.DATABASE_URL;
+  const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error("还没设定 DATABASE_URL（Supabase 的 Postgres 连接字符串）");
   }
-  // Supabase pooler 的 transaction mode（6543）遇到 postgres.js 同一连接上排队的多个查询会卡死，
-  // 改走同一个 host 的 session mode（5432）
-  url = url.replace(/(\.pooler\.supabase\.com):6543\//, "$1:5432/");
   const host = (() => {
     try {
       return new URL(url).hostname;
@@ -145,17 +142,53 @@ create table if not exists app_settings (
   key text primary key,
   value text not null
 );
+
+-- Phase 2：TNG 进账通知自动记账 + 手机通知
+alter table users add column if not exists remind_every integer not null default 2;
+alter table users add column if not exists notify_payments boolean not null default true;
+alter table users add column if not exists remind_last_at timestamptz;
+
+-- 确认过的 TNG 名字（大写、去符号）→ 哪个朋友
+create table if not exists tng_aliases (
+  alias text primary key,
+  person_id uuid not null references people(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+-- iPhone 捷径传来的每一个 TNG 通知
+create table if not exists incoming_payments (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users(id) on delete cascade,
+  raw_text text not null,
+  sender_name text,
+  amount_cents integer,
+  direction text not null default 'unknown',
+  status text not null default 'pending',
+  reason text,
+  from_person_id uuid references people(id),
+  payment_id uuid references payments(id) on delete set null,
+  verdict text,
+  verdict_kind text,
+  received_at timestamptz not null default now(),
+  resolved_at timestamptz
+);
+create index if not exists incoming_user_idx on incoming_payments (user_id, received_at desc);
+
+create table if not exists push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  user_agent text,
+  created_at timestamptz not null default now(),
+  last_ok_at timestamptz,
+  fail_count integer not null default 0
+);
 `;
 
 async function ensureSchema(sql: postgres.Sql): Promise<void> {
-  // 表已经建好就不用再抢锁（serverless 每次冷启动都会跑到这里）
-  const [{ ready }] = await sql`select to_regclass('public.app_settings') is not null as ready`;
-  if (ready) return;
   await sql.begin(async (tx) => {
-    // 卡住的连接不要把整个 function 拖到 300 秒 timeout，宁可快点报错
-    await tx`set local lock_timeout = '10s'`;
-    await tx`set local statement_timeout = '30s'`;
-    await tx`set local idle_in_transaction_session_timeout = '30s'`;
     await tx`select pg_advisory_xact_lock(727101)`;
     await tx.unsafe(SCHEMA);
   });

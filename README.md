@@ -1,6 +1,6 @@
 # KiraMakan
 
-聚餐分账 + 追钱。拍 receipt → 两个 AI 一起拆 item、互相比对 → 朋友点自己吃的 → 自动摊 tax → 记录谁还了钱。
+聚餐分账 + 追钱。拍 receipt → 两个 AI 一起拆 item、互相比对 → 朋友点自己吃的 → 自动摊 tax → 朋友用 TNG 转钱时自动记账 → 每隔一天提醒你谁还没还。
 
 ## 有什么功能
 
@@ -16,6 +16,11 @@
 - **两个付钱的人（做法二）**：你和 B 各有帐号、各自的收款 QR。谁付的那餐，朋友就还给谁。你欠 B、B 欠你的可以一键互抵。
 - **记录收款**：输入金额时自动判断「刚好付清 / 忘了给 tax，还差多少 / 还欠多少 / 多给了（记成 credit 下次扣）」。
 - **专属 link**：每个朋友一个 link，看自己总共欠谁、每一餐的明细。
+- **TNG 进账自动记账**：iPhone 收到 TNG「收到钱」的通知时，「快捷指令」自动把通知内容传给 KiraMakan。
+  - 认得出是哪个朋友、金额不超过他欠的 → 直接记好（少给 tax 也会照记，并标出还差多少）。
+  - 名字对不上、他没欠钱、或多给了 → 放在「TNG 进账」的「待确认」，一按就记；选过一次的 TNG 名字下次自动认得。
+  - 你付钱出去、cashback、reload、广告的通知不会记。记错了可以按「撤销」。
+- **手机通知 + 提醒**：每笔自动记好、少给 tax、不知道是谁转的，都会通知你。每天或每隔一天（可以选）晚上提醒：谁还没还（吃了什么）、谁少给 tax、哪些 item 没人认领。按通知会打开「谁还没还」页面，可以一按 WhatsApp 催他。
 - 手机可以「加到主画面」当 app 用，支持深色模式。
 
 ## 部署（大约 15 分钟）
@@ -28,7 +33,7 @@
 
 不用自己建表：第一次打开网站时会自动建好。
 
-免费方案一个星期没人用会暂停。`vercel.json` 已经设定 Vercel 每天自动 ping 一次，所以不会停。
+免费方案一个星期没人用会暂停。`vercel.json` 已经设定 Vercel 每天自动 ping 一次，所以不会停（同一个设定也负责每天晚上发「谁还没还」的提醒）。
 
 ### 2. 读 receipt 的 AI key
 
@@ -64,8 +69,10 @@ vercel --prod
 1. 打开 Vercel 给你的网址，会自动去「第一次设定」，建立你的帐号。
 2. 到「设定」：上传 TNG 收款 QR 的截图（TNG → 收款 / Receive → 截图），填给朋友转账用的电话。
 3. 到「设定」→「帮另一个付钱的人开帐号」，帮 B 开帐号，把登入名和临时密码给他。
-4. 在手机浏览器按「分享 → 加到主画面」，以后就像 app 一样打开。
-5. 拿 5–10 张以前的 receipt 照片试新增账单，看两个 AI 读得准不准。
+4. 在 iPhone 的 Safari 按「分享 → 加入主画面」，以后从主画面打开（手机通知一定要这样才能开）。
+5. 从主画面打开 →「设定」→「手机通知」按「开启通知」，跳出来时按「允许」。
+6. 「设定」→「TNG 进账自动记录」→「iPhone 设定」，照着做一次（大约 3 分钟），再叫朋友转 RM 0.10 试试。
+7. 拿 5–10 张以前的 receipt 照片试新增账单，看两个 AI 读得准不准。
 
 ## 怎么用
 
@@ -73,8 +80,9 @@ vercel --prod
 2. 按 WhatsApp 把 link 丢进 group（或者自己先帮大家分 item：先选人，再点他吃的）。
 3. 看账单页的「对账」：显示 ✓ 就代表大家要付的加起来刚好等于你付的。
 4. 朋友开 link → 选自己的名字 → 点吃的 → 去付款。
-5. 收到钱后，在账单或朋友页面按「记录收款」。Phase 2 会改成自动。
-6. 有人一直没还：到朋友页面按 WhatsApp，把他的专属 link 发给他。
+5. 朋友用 TNG 转钱给你：自动记好，手机会通知你。「首页」出现橘色的「要你确认」时，按进去选是谁就好。
+6. 不是用 TNG 转的（例如现金）：在账单或朋友页面按「记录收款」。
+7. 有人一直没还：按提醒通知（或首页「谁吃了什么」）打开「谁还没还」，按「催他」用 WhatsApp 发给他，会写出他欠多少、吃了什么，还有他的专属 link。
 
 ## 环境变量
 
@@ -86,8 +94,11 @@ vercel --prod
 | `OPENAI_API_KEY` | 否 | 有的话变成第三个一起比对 |
 | `GEMINI_MODEL` / `DEEPSEEK_MODEL` / `OPENAI_MODEL` | 否 | 指定模型（可以用逗号列几个，按顺序试）。没设会用默认：Gemini `gemini-3.8-flash` → `gemini-3.5-flash-lite`；DeepSeek `deepseek-flash` → `deepseek-v4-flash-vision-exp`；OpenAI `gpt-6-luna` → `gpt-5.4-mini` → `gpt-5-mini` |
 | `SESSION_SECRET` | 否 | 登入 cookie 的签名密钥。没设会自动产生并存在资料库 |
-| `CRON_SECRET` | 否 | 设了的话，每天的自动 ping 要带这个密钥（Vercel 会自动带） |
+| `CRON_SECRET` | 否 | 设了的话，每天的 cron（ping 资料库、发提醒）要带这个密钥（Vercel 会自动带） |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | 否 | 手机通知的金钥。没设会自动产生并存在资料库；之后换金钥的话，每部手机要重新按一次「开启通知」 |
+| `VAPID_SUBJECT` | 否 | 手机通知的联络方式（`mailto:` 或 `https://`）。没设会用 Vercel 的网址 |
 | `OCR_MOCK` | 否 | 本机测试用假资料：`1` 两个 AI 读得不一样、`agree` 一样、`single` 只有一个读到、`extra` 另一个多读到一个 item |
+| `PUSH_MOCK` | 否 | 本机测试：`1` 的话手机通知不真的发，印在 log（`[push:mock]`） |
 
 ## 要知道的限制
 
@@ -98,7 +109,12 @@ vercel --prod
 - **「QR 带金额」是实验功能**，默认关闭。TNG 不一定接受自己加进去的金额，请先叫一个朋友扫扫看，金额有自动出现才在设定里打开。
 - 朋友的 link 不用登入：拿到 link 的人可以选任何名字点 item。朋友之间够用，但不要把 link 公开贴出去。
 - 付款记录是「人对人」的余额，不是绑某一餐：还款会先还最早的一餐（FIFO）。删掉一张单不会删掉已记录的付款。
-- Phase 2 还没做：TNG 进账通知自动对账、每星期上传 TNG 交易记录 PDF 补漏。
+- **TNG 进账自动记账要 iPhone 的 iOS 27 以上**（「快捷指令」才有「收到通知时」的自动化）。手机关机、没网络、或专注模式挡住 TNG 通知时，那一笔不会传过来：每天的提醒还是会显示他没还，手动「记录收款」就好。
+- TNG 没有公开通知的格式，KiraMakan 用规则读金额和名字（英文、马来文、中文都试着读）。读不懂的会放在「待确认」或「其他 TNG 通知」，你可以看到收到的原文。
+- 专属网址（`/api/hook/tng/...`）就像密码：拿到的人可以假装 TNG 通知。外泄的话到「iPhone 设定」最下面按「换一个新网址」。
+- 手机通知：iPhone 要 iOS 16.4 以上，而且一定要从主画面打开 KiraMakan 才能开。每部手机要各自开一次。
+- Vercel 免费版的 cron 每天只能跑一次，而且是在那一个小时里任何时间，所以提醒大约在晚上 9 点到 10 点之间。
+- 还没做：每星期上传 TNG 交易记录 PDF，补回 iPhone 没传到的进账。
 
 ## 读不到 receipt 怎么办
 
@@ -119,7 +135,7 @@ vercel --prod
 npm install
 cp .env.example .env.local   # 填 DATABASE_URL（本机 Postgres 或 Supabase 都可以）
 npm run dev                  # http://localhost:3000
-npm test                     # 金额计算、对账、两个 AI 比对、AI 出错处理、QR 的单元测试
+npm test                     # 金额计算、对账、两个 AI 比对、AI 出错处理、QR、TNG 通知、提醒的单元测试
 ```
 
 ## 技术
@@ -137,4 +153,8 @@ Next.js 16（App Router）、Postgres（postgres.js）、Gemini / DeepSeek / Ope
 - `src/lib/emvqr.ts`：DuitNow / EMV QR 解析和加金额
 - `src/lib/server/ocr.ts`：读 receipt 的 prompt、各家 API 的接法、「检查 AI」
 - `src/lib/ai-errors.ts`：把各家 API 的错误变成看得懂的原因
-- `src/lib/server/db.ts`：资料表（第一次连线自动建立）
+- `src/lib/tng-notify.ts`：读 TNG 通知（金额、谁转的、收钱还是付钱）、名字对上哪个朋友
+- `src/lib/server/incoming.ts`：通知 → 自动记账 / 待确认 / 撤销；`src/app/api/hook/tng/[key]` 是 iPhone 捷径打的网址
+- `src/lib/remind.ts`、`src/lib/server/remind.ts`：「谁还没还」的内容、提醒文字、每天的 cron（`/api/cron/remind`）
+- `src/lib/server/push.ts`、`public/sw.js`：手机通知（Web Push）
+- `src/lib/server/db.ts`：资料表（第一次连线自动建立，新版本的栏位也会自动加上）

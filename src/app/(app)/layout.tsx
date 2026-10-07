@@ -3,6 +3,7 @@ import { currentUser, hasAnyUser } from "@/lib/server/auth";
 import { TabBar } from "@/components/TabBar";
 import { Toaster } from "@/components/ui-client";
 import { SetupProblem } from "@/components/SetupProblem";
+import { PushSync } from "@/components/PushSync";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       {children}
       <TabBar />
       <Toaster />
+      <PushSync />
     </div>
   );
 }

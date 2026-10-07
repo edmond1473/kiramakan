@@ -36,11 +36,8 @@ async function sessionSecret(): Promise<string> {
   if (cachedSecret) return cachedSecret;
   const sql = await db();
   const fresh = randomToken(32);
-  // 一句做完：pooler 是 transaction mode，拆成 insert + select 两句偶尔会读不到
-  const rows = await sql<{ value: string }[]>`
-    insert into app_settings (key, value) values ('session_secret', ${fresh})
-    on conflict (key) do update set key = excluded.key
-    returning value`;
+  await sql`insert into app_settings (key, value) values ('session_secret', ${fresh}) on conflict (key) do nothing`;
+  const rows = await sql<{ value: string }[]>`select value from app_settings where key = 'session_secret'`;
   cachedSecret = rows[0].value;
   return cachedSecret;
 }

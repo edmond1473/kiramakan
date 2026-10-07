@@ -1,13 +1,22 @@
 import type { Metadata } from "next";
 import { pageUser } from "@/lib/server/auth";
 import { loadWorld } from "@/lib/server/world";
+import { lastNoticeAt, pendingCount } from "@/lib/server/incoming";
+import { deviceCount } from "@/lib/server/push";
+import { notifySettings } from "@/lib/server/remind";
 import { Settings } from "./Settings";
 
 export const metadata: Metadata = { title: "设定" };
 
 export default async function SettingsPage() {
   const me = await pageUser();
-  const w = await loadWorld();
+  const [w, lastNotice, pending, devices, notify] = await Promise.all([
+    loadWorld(),
+    lastNoticeAt(me.id),
+    pendingCount(me.id),
+    deviceCount(me.id),
+    notifySettings(me.id),
+  ]);
   const people = [...w.people.values()]
     .filter((p) => p.isActive && !p.userId)
     .map((p) => ({ id: p.id, name: p.name }));
@@ -25,6 +34,8 @@ export default async function SettingsPage() {
       }}
       friendsWithoutAccount={people}
       payers={payers}
+      tng={{ lastNoticeAt: lastNotice, pending }}
+      push={{ devices, remindEvery: notify.remindEvery, notifyPayments: notify.notifyPayments }}
     />
   );
 }

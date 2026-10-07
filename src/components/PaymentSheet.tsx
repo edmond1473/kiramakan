@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/client/api";
 import { centsToPlain, formatRM, parseRM } from "@/lib/money";
 import type { PaymentVerdict } from "@/lib/ledger";
-import { Button, Notice, todayMY } from "./ui";
+import { Button, Notice, formatWhen, todayMY } from "./ui";
 import { Field, Sheet, toast } from "./ui-client";
 
 interface Props {
@@ -26,7 +26,7 @@ function PaymentSheetInner({ onClose, from, to, suggestedCents, onSaved }: Props
   const [amount, setAmount] = useState(suggestedCents > 0 ? centsToPlain(suggestedCents) : "");
   const [date, setDate] = useState(todayMY());
   const [note, setNote] = useState("");
-  const [preview, setPreview] = useState<{ cents: number; verdict: PaymentVerdict } | null>(null);
+  const [preview, setPreview] = useState<{ cents: number; verdict: PaymentVerdict; alreadyAuto: string | null } | null>(null);
   const [saving, setSaving] = useState(false);
 
   const cents = parseRM(amount);
@@ -35,10 +35,10 @@ function PaymentSheetInner({ onClose, from, to, suggestedCents, onSaved }: Props
     let alive = true;
     const t = setTimeout(async () => {
       try {
-        const r = await api<{ verdict: PaymentVerdict }>("/api/payments/preview", {
+        const r = await api<{ verdict: PaymentVerdict; alreadyAuto: string | null }>("/api/payments/preview", {
           body: { fromPersonId: from.id, toPersonId: to.id, amountCents: cents },
         });
-        if (alive) setPreview({ cents, verdict: r.verdict });
+        if (alive) setPreview({ cents, verdict: r.verdict, alreadyAuto: r.alreadyAuto });
       } catch {
         // 预览失败不影响记录
       }
@@ -49,6 +49,7 @@ function PaymentSheetInner({ onClose, from, to, suggestedCents, onSaved }: Props
     };
   }, [cents, from.id, to.id]);
   const verdict = preview && preview.cents === cents ? preview.verdict : null;
+  const alreadyAuto = preview && preview.cents === cents ? preview.alreadyAuto : null;
 
   async function save() {
     if (!cents || cents <= 0) return;
@@ -92,6 +93,11 @@ function PaymentSheetInner({ onClose, from, to, suggestedCents, onSaved }: Props
           className="[&_input]:tabular [&_input]:h-14 [&_input]:text-[24px] [&_input]:font-semibold"
           hint={suggestedCents > 0 ? `目前欠 ${formatRM(suggestedCents)}` : undefined}
         />
+        {alreadyAuto && (
+          <Notice tone="warn">
+            TNG 通知已经自动记了一笔一样的 {formatRM(cents ?? 0)}（{formatWhen(alreadyAuto)}）。是同一笔的话不用再记。
+          </Notice>
+        )}
         {verdict && <Notice tone={tone}>{verdict.message}</Notice>}
         <Field label="日期" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         <Field label="备注（可以不填）" value={note} onChange={(e) => setNote(e.target.value)} placeholder="例如 TNG 转账" />

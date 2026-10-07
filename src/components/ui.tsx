@@ -359,3 +359,34 @@ export function daysSince(isoDate: string): number {
   const b = Date.UTC(+isoDate.slice(0, 4), +isoDate.slice(5, 7) - 1, +isoDate.slice(8, 10));
   return Math.max(0, Math.round((a - b) / 86400000));
 }
+
+/** 什么时候（马来西亚时间）：「今天 9:41 PM」「昨天 8:02 AM」「3 Oct 7:15 PM」 */
+export function formatWhen(iso: string): string {
+  const d = new Date(iso);
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur" }).format(d);
+  const time = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kuala_Lumpur", hour: "numeric", minute: "2-digit" }).format(d);
+  const ago = daysSince(day);
+  if (ago === 0) return `今天 ${time}`;
+  if (ago === 1) return `昨天 ${time}`;
+  return `${formatDateShort(day)} ${time}`;
+}
+
+/** iOS 风格的开关（只是样子，按的是外面那一行） */
+export function Toggle({ on }: { on: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={cx(
+        "relative inline-flex h-[31px] w-[51px] shrink-0 rounded-full transition-colors",
+        on ? "bg-forest" : "bg-fill-2",
+      )}
+    >
+      <span
+        className={cx(
+          "absolute top-[2px] size-[27px] rounded-full bg-white shadow transition-transform",
+          on ? "translate-x-[22px]" : "translate-x-[2px]",
+        )}
+      />
+    </span>
+  );
+}

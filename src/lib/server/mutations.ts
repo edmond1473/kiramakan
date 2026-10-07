@@ -257,7 +257,18 @@ export async function recordPayment(
 export async function previewPayment(fromPersonId: string, toPersonId: string, amountCents: number) {
   const w = await loadWorld();
   const ledger = ledgerBetween(w, fromPersonId, toPersonId);
-  return { verdict: classifyPayment(amountCents, ledger), balance: ledger.balance };
+  // TNG 通知已经自动记了同样金额的一笔：提醒不要再记一次
+  const sql = await db();
+  const [recent] = await sql<{ paid_at: Date }[]>`
+    select paid_at from payments
+    where from_person_id = ${fromPersonId} and to_person_id = ${toPersonId} and amount_cents = ${amountCents}
+      and source = 'tng' and created_at > now() - interval '3 days'
+    order by created_at desc limit 1`;
+  return {
+    verdict: classifyPayment(amountCents, ledger),
+    balance: ledger.balance,
+    alreadyAuto: recent ? recent.paid_at.toISOString() : null,
+  };
 }
 
 export async function deletePayment(id: string, user: SessionUser) {
@@ -267,7 +278,13 @@ export async function deletePayment(id: string, user: SessionUser) {
   if (p.to_person_id !== user.personId && p.from_person_id !== user.personId && !user.isAdmin) {
     throw new HttpError(403, "只能删除跟你有关的付款");
   }
-  await sql`delete from payments where id = ${id}`;
+  await sql.begin(async (tx) => {
+    // 这笔是 TNG 通知自动记的：通知改成「不记」，不然「TNG 进账」还会显示已记录
+    await tx`
+      update incoming_payments set status = 'ignored', payment_id = null, resolved_at = now()
+      where payment_id = ${id}`;
+    await tx`delete from payments where id = ${id}`;
+  });
 }
 
 /** 你欠对方、对方也欠你 → 互相抵掉较小的那个数 */
@@ -326,7 +343,15 @@ export async function createPayerAccount(input: { personId?: string | null; name
 
 export async function updateMe(
   user: SessionUser,
-  patch: { name?: string; tngName?: string | null; qrPayload?: string | null; qrAmountEnabled?: boolean; payPhone?: string | null },
+  patch: {
+    name?: string;
+    tngName?: string | null;
+    qrPayload?: string | null;
+    qrAmountEnabled?: boolean;
+    payPhone?: string | null;
+    remindEvery?: number;
+    notifyPayments?: boolean;
+  },
 ) {
   const sql = await db();
   if (patch.name !== undefined || patch.tngName !== undefined) {
@@ -336,7 +361,9 @@ export async function updateMe(
     update users set
       qr_payload = case when ${patch.qrPayload !== undefined} then ${patch.qrPayload ?? null} else qr_payload end,
       qr_amount_enabled = coalesce(${patch.qrAmountEnabled ?? null}::boolean, qr_amount_enabled),
-      pay_phone = case when ${patch.payPhone !== undefined} then ${patch.payPhone?.trim() || null} else pay_phone end
+      pay_phone = case when ${patch.payPhone !== undefined} then ${patch.payPhone?.trim() || null} else pay_phone end,
+      remind_every = coalesce(${patch.remindEvery ?? null}::int, remind_every),
+      notify_payments = coalesce(${patch.notifyPayments ?? null}::boolean, notify_payments)
     where id = ${user.id}`;
 }
 

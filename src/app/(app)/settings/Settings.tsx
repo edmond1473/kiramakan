@@ -10,11 +10,14 @@ import { QrCode } from "@/components/QrCode";
 import { Button, Group, Notice, PageHeader, Row, Tag } from "@/components/ui";
 import { Field, Sheet, selectClass, toast } from "@/components/ui-client";
 import { AiCheck } from "./AiCheck";
+import { PushGroup, TngGroup } from "./NotifySettings";
 
 export function Settings({
   me,
   friendsWithoutAccount,
   payers,
+  tng,
+  push,
 }: {
   me: {
     name: string;
@@ -27,6 +30,8 @@ export function Settings({
   };
   friendsWithoutAccount: { id: string; name: string }[];
   payers: { id: string; name: string }[];
+  tng: { lastNoticeAt: string | null; pending: number };
+  push: { devices: number; remindEvery: number; notifyPayments: boolean };
 }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -160,6 +165,9 @@ export function Settings({
           </Group>
         )}
 
+        <TngGroup lastNoticeAt={tng.lastNoticeAt} pending={tng.pending} />
+        <PushGroup devices={push.devices} remindEvery={push.remindEvery} notifyPayments={push.notifyPayments} />
+
         <AiCheck />
 
         <Group title="帐号" footer={`登入名：${me.username}`}>
@@ -188,7 +196,7 @@ export function Settings({
 
         <Group title="快要来">
           <div className="p-5 text-[14px] leading-[21px] text-label-2">
-            自动对账：TNG 收到钱的通知会自动打勾、抓出谁忘了给 tax；每星期上传 TNG 交易记录 PDF 补漏。
+            每星期上传 TNG 交易记录 PDF，补回 iPhone 没传到的进账。
           </div>
         </Group>
         <div className="h-6" />

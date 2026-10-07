@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeftRight, MessageCircle, Pencil, Trash2 } from "lucide-react";
 import { api } from "@/lib/client/api";
 import { formatRM } from "@/lib/money";
+import { waLink } from "@/lib/wa";
 import { isSettled, type BillPayStatus } from "@/lib/ledger";
 import { PaymentSheet } from "@/components/PaymentSheet";
 import { BigMoney, Button, Group, Money, PageHeader, Row, StatusChip, Tag, buttonClass, cx, formatDate } from "@/components/ui";
@@ -143,7 +144,7 @@ export function PersonDetail({
             <p className="mt-1.5 text-[14px] leading-5 text-label-2">他的专属 link：全部欠款、每一餐的明细，还有你的收款 QR。</p>
             <div className="mt-4 grid grid-cols-2 gap-2">
               <a
-                href={`https://wa.me/${person.phone ? waNumber(person.phone) : ""}?text=${encodeURIComponent(waText)}`}
+                href={waLink(person.phone, waText)}
                 target="_blank"
                 rel="noreferrer"
                 className={buttonClass("tinted", "md", true)}
@@ -248,13 +249,6 @@ function ChargeRow({ c }: { c: ChargeV }) {
       </div>
     </Row>
   );
-}
-
-function waNumber(phone: string): string {
-  const d = phone.replace(/\D/g, "");
-  if (d.startsWith("60")) return d;
-  if (d.startsWith("0")) return `6${d}`;
-  return d;
 }
 
 function EditPersonSheet(props: {

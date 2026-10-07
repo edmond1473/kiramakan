@@ -6,7 +6,7 @@ import { ReceiptText, Settings, Users } from "lucide-react";
 import { cx } from "./ui";
 
 const tabs = [
-  { href: "/", label: "账本", icon: ReceiptText, match: (p: string) => p === "/" || p.startsWith("/bills") },
+  { href: "/", label: "账本", icon: ReceiptText, match: (p: string) => p === "/" || ["/bills", "/remind", "/inbox"].some((x) => p.startsWith(x)) },
   { href: "/people", label: "朋友", icon: Users, match: (p: string) => p.startsWith("/people") },
   { href: "/settings", label: "设定", icon: Settings, match: (p: string) => p.startsWith("/settings") },
 ];

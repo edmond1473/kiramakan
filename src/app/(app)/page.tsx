@@ -1,8 +1,10 @@
 import type { Viewport } from "next";
-import { ArrowRight, Plus } from "lucide-react";
+import { ArrowRight, BellRing, Check, Plus } from "lucide-react";
 import Link from "next/link";
 import { pageUser } from "@/lib/server/auth";
 import { balancesFor, billView, loadWorld } from "@/lib/server/world";
+import { lastNoticeAt, pendingCount } from "@/lib/server/incoming";
+import { deviceCount } from "@/lib/server/push";
 import {
   Avatar,
   BigMoney,
@@ -28,7 +30,12 @@ function agoLabel(days: number): string {
 
 export default async function Home() {
   const me = await pageUser();
-  const w = await loadWorld();
+  const [w, pending, devices, lastNotice] = await Promise.all([
+    loadWorld(),
+    pendingCount(me.id),
+    deviceCount(me.id),
+    lastNoticeAt(me.id),
+  ]);
   const { receivables, payables } = balancesFor(w, me.personId);
   const owedToMe = receivables.filter((r) => r.ledger.balance > 0);
   const credits = receivables.filter((r) => r.ledger.balance < 0);
@@ -86,8 +93,53 @@ export default async function Home() {
       </Hero>
 
       <div className="px-4">
+        {pending > 0 && (
+          <Link href="/inbox" className="press on-color mt-6 flex items-center gap-3 rounded-[24px] bg-flare p-4 text-ink">
+            <BellRing className="size-6 shrink-0" strokeWidth={2} aria-hidden />
+            <div className="min-w-0 flex-1">
+              <p className="text-[16px] leading-[21px] font-semibold">{pending} 笔 TNG 进账要你确认</p>
+              <p className="mt-0.5 text-[13px] leading-[18px]">按这里看是谁转的、要不要记。</p>
+            </div>
+            <ArrowRight className="size-5 shrink-0" strokeWidth={2.25} aria-hidden />
+          </Link>
+        )}
+
+        {!noBills && (devices === 0 || !lastNotice) && (
+          <section className="card mt-6 rounded-[24px] bg-surface p-5">
+            <p className="label-mono text-label-2">自动记账还没设定好</p>
+            <ul className="mt-3 space-y-1">
+              {[
+                { done: devices > 0, href: "/settings", text: "开手机通知", hint: "朋友转钱、谁还没还会通知你" },
+                { done: !!lastNotice, href: "/settings/tng-setup", text: "iPhone 设定", hint: "收到 TNG 的钱自动记账" },
+              ].map((x) => (
+                <li key={x.href}>
+                  <Link href={x.href} className="-mx-2 flex items-center gap-3 rounded-[16px] px-2 py-2 active:bg-fill">
+                    <span
+                      className={`flex size-7 shrink-0 items-center justify-center rounded-full ${x.done ? "bg-forest text-white" : "border-[1.5px] border-label-3"}`}
+                    >
+                      {x.done && <Check className="size-4" strokeWidth={3} aria-hidden />}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className={`block text-[15px] leading-5 font-semibold ${x.done ? "text-label-3 line-through" : ""}`}>{x.text}</span>
+                      <span className="block text-[12px] leading-4 text-label-2">{x.hint}</span>
+                    </span>
+                    {!x.done && <ArrowRight className="size-4 shrink-0 text-label-3" strokeWidth={2} aria-hidden />}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {owedToMe.length > 0 && (
-          <Group title="还没还你的">
+          <Group
+            title="还没还你的"
+            action={
+              <Link href="/remind" className="label-mono inline-flex items-center gap-1 text-label underline-offset-4 active:opacity-60">
+                谁吃了什么 <ArrowRight className="size-3.5" strokeWidth={2.5} aria-hidden />
+              </Link>
+            }
+          >
             {owedToMe.map((r) => {
               const forgotTax = r.openCharges.some((c) => c.status === "forgot_tax");
               const first = r.openCharges[0]?.billDate;

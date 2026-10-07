@@ -9,6 +9,8 @@ const Patch = z.object({
   qrPayload: z.string().max(1000).nullable().optional(),
   qrAmountEnabled: z.boolean().optional(),
   payPhone: z.string().trim().max(30).nullable().optional(),
+  remindEvery: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
+  notifyPayments: z.boolean().optional(),
 });
 
 export async function PATCH(req: Request) {
