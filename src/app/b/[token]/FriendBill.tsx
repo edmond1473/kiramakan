@@ -4,7 +4,8 @@ import { useState, useSyncExternalStore } from "react";
 import { Lock, UserPlus } from "lucide-react";
 import type { BillView } from "@/lib/server/world";
 import { api } from "@/lib/client/api";
-import { formatRM } from "@/lib/money";
+import { centsToPlain, formatRM } from "@/lib/money";
+import { copyAndOpenTng, usePlatform } from "@/lib/client/tng";
 import { ItemAssigner } from "@/components/ItemAssigner";
 import { PayCard } from "@/components/PayCard";
 import { Avatar, BigMoney, Button, Group, Hero, Money, Notice, Row, StatusChip, Tag, cx, formatDate } from "@/components/ui";
@@ -43,6 +44,7 @@ function subscribeMe(cb: () => void) {
 export function FriendBill({ token, initialView }: { token: string; initialView: BillView }) {
   const [view, setView] = useState(initialView);
   const ready = useIsClient();
+  const platform = usePlatform();
   const storedMe = useSyncExternalStore(subscribeMe, readMe, () => null);
   const [busyItem, setBusyItem] = useState<string | null>(null);
   const [payOpen, setPayOpen] = useState(false);
@@ -244,7 +246,19 @@ export function FriendBill({ token, initialView }: { token: string; initialView:
                   )}
                 </div>
                 {meP.status !== "paid" && meP.owed > 0 && (
-                  <Button variant="filled" size="lg" className="px-6" onClick={() => setPayOpen(true)}>
+                  <Button
+                    variant="filled"
+                    size="lg"
+                    className="px-6"
+                    onClick={() => {
+                      // 一按：复制金额 + 打开 TNG；回来时付款画面（QR、电话）已经开着
+                      setPayOpen(true);
+                      if (platform !== "other") {
+                        copyAndOpenTng(centsToPlain(payAmount), platform);
+                        toast(`已复制 ${centsToPlain(payAmount)}，到 TNG 贴上就好`);
+                      }
+                    }}
+                  >
                     去付款
                   </Button>
                 )}

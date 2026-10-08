@@ -12,7 +12,7 @@
 - **加起来要等于总额才能继续**：核对画面会检查 item + SST / service charge / rounding / 折扣是否刚好等于总额。只差几仙一按补 Rounding；差更多要对 receipt 改，或者一按把差额记成一行「其他」。server 也会再检查一次。
 - **自动摊 tax**：用「总额 ÷ item 加起来」得出倍数，每人的 item 乘这个倍数，不用知道税率。每个人的金额加起来一定刚好等于总额。
 - **对账**：账单页显示「大家要付的加起来 = 你付的总额 ✓」。有 item 没人认领时，直接写出你会少收多少，一按就能让大家平分。
-- **朋友 link**：每餐一个 link 丢进 WhatsApp group。朋友选名字、点自己吃的（几个人分一个 item、选份数都可以），马上看到含 tax 的金额、你的收款 QR 和「复制金额」。
+- **朋友 link**：每餐一个 link 丢进 WhatsApp group。朋友选名字、点自己吃的（几个人分一个 item、选份数都可以），马上看到含 tax 的金额。按「去付款」会自动复制金额、打开 TNG app，朋友在 TNG 按 Transfer → 选你 → 贴上金额 → PIN；回到网页还有你的收款 QR 和电话。
 - **两个付钱的人（做法二）**：你和 B 各有帐号、各自的收款 QR。谁付的那餐，朋友就还给谁。你欠 B、B 欠你的可以一键互抵。
 - **记录收款**：输入金额时自动判断「刚好付清 / 忘了给 tax，还差多少 / 还欠多少 / 多给了（记成 credit 下次扣）」。
 - **专属 link**：每个朋友一个 link，看自己总共欠谁、每一餐的明细。
@@ -114,6 +114,7 @@ vercel --prod
 - 专属网址（`/api/hook/tng/...`）就像密码：拿到的人可以假装 TNG 通知。外泄的话到「iPhone 设定」最下面按「换一个新网址」。
 - 手机通知：iPhone 要 iOS 16.4 以上，而且一定要从主画面打开 KiraMakan 才能开。每部手机要各自开一次。
 - Vercel 免费版的 cron 每天只能跑一次，而且是在那一个小时里任何时间，所以提醒大约在晚上 9 点到 10 点之间。
+- **「去付款」打开 TNG** 用的是 TNG 官方的 `tngdwallet://` 链接（Android 用 Chrome 的 intent 链接，打不开会去 Play Store 的 TNG 页面）。只能打开 TNG，不能帮朋友选好收款人或填好金额（TNG 没有开放个人转账给外面的网站），所以金额会先复制好。iPhone 会先问「在 TNG eWallet 中打开？」。电脑上不会去打开。
 - 还没做：每星期上传 TNG 交易记录 PDF，补回 iPhone 没传到的进账。
 
 ## 读不到 receipt 怎么办
@@ -157,4 +158,5 @@ Next.js 16（App Router）、Postgres（postgres.js）、Gemini / DeepSeek / Ope
 - `src/lib/server/incoming.ts`：通知 → 自动记账 / 待确认 / 撤销；`src/app/api/hook/tng/[key]` 是 iPhone 捷径打的网址
 - `src/lib/remind.ts`、`src/lib/server/remind.ts`：「谁还没还」的内容、提醒文字、每天的 cron（`/api/cron/remind`）
 - `src/lib/server/push.ts`、`public/sw.js`：手机通知（Web Push）
+- `src/lib/tng-link.ts`、`src/lib/client/tng.ts`：朋友按「去付款」时复制金额、打开 TNG app
 - `src/lib/server/db.ts`：资料表（第一次连线自动建立，新版本的栏位也会自动加上）

@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo } from "react";
+import { ExternalLink } from "lucide-react";
 import { withAmount } from "@/lib/emvqr";
 import { centsToPlain, formatRM } from "@/lib/money";
+import { copyAndOpenTng, usePlatform } from "@/lib/client/tng";
 import { QrCode } from "./QrCode";
-import { CopyButton } from "./ui-client";
-import { BigMoney, Notice } from "./ui";
+import { CopyButton, toast } from "./ui-client";
+import { BigMoney, Button, Notice } from "./ui";
 
 export interface Payee {
   personId: string;
@@ -15,7 +17,7 @@ export interface Payee {
   payPhone: string | null;
 }
 
-/** 朋友付钱用的卡：金额、复制金额、步骤、QR */
+/** 朋友付钱用的卡：金额、一按复制金额 + 打开 TNG、步骤、QR */
 export function PayCard({
   payee,
   amountCents,
@@ -34,11 +36,13 @@ export function PayCard({
     return { payload: payee.qrPayload, withAmount: false };
   }, [payee.qrPayload, payee.qrAmountEnabled, amountCents]);
 
-  const steps = [
-    "打开 TNG → Transfer",
-    `选 ${payee.name}${payee.payPhone ? "（或贴上电话）" : ""}，贴上金额`,
-    "确认，输入 PIN",
-  ];
+  const platform = usePlatform();
+  const phone = platform !== "other";
+  const amountText = centsToPlain(amountCents);
+  const pick = `选 ${payee.name}${payee.payPhone ? "（或贴上电话）" : ""}，贴上金额`;
+  const steps = phone
+    ? ["按上面的按钮：金额会复制好，打开 TNG", `按 Transfer → ${pick}`, "确认，输入 PIN"]
+    : ["打开 TNG → Transfer", pick, "确认，输入 PIN"];
 
   return (
     <div className="card rounded-[24px] bg-surface p-5">
@@ -51,18 +55,33 @@ export function PayCard({
       )}
 
       <div className="mt-5 grid grid-cols-1 gap-2">
-        <CopyButton
-          text={centsToPlain(amountCents)}
-          label="复制金额"
-          done={`已复制 ${centsToPlain(amountCents)}`}
-          variant="filled"
-          size="lg"
-          full
-        />
+        {phone ? (
+          <>
+            <Button
+              variant="filled"
+              size="lg"
+              full
+              onClick={() => {
+                copyAndOpenTng(amountText, platform);
+                toast(`已复制 ${amountText}，到 TNG 贴上就好`);
+              }}
+            >
+              <ExternalLink className="size-[18px]" strokeWidth={2.25} aria-hidden /> 复制金额，打开 TNG
+            </Button>
+            <CopyButton text={amountText} label="只复制金额" done={`已复制 ${amountText}`} variant="gray" full />
+          </>
+        ) : (
+          <CopyButton text={amountText} label="复制金额" done={`已复制 ${amountText}`} variant="filled" size="lg" full />
+        )}
         {payee.payPhone && (
           <CopyButton text={payee.payPhone.replace(/[^\d+]/g, "")} label={`复制 TNG 电话 ${payee.payPhone}`} variant="gray" full />
         )}
       </div>
+      {phone && (
+        <p className="mt-2.5 px-1 text-[12px] leading-[17px] text-label-2">
+          没有自动打开的话，自己打开 TNG 也可以，金额已经复制好了。
+        </p>
+      )}
 
       <ol className="mt-6 space-y-3">
         {steps.map((s, i) => (
