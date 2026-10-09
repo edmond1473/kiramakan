@@ -85,7 +85,7 @@ const SCHEMA = {
 
 type Format = "json_schema" | "json_object" | "none";
 
-interface ProviderConf {
+export interface ProviderConf {
   id: ProviderId;
   label: string;
   url: string;
@@ -101,7 +101,7 @@ const list = (v: string | undefined) => (v ? v.split(",").map((s) => s.trim()).f
 /** 两个都算得通时，优先用这个顺序 */
 export const PROVIDER_ORDER: ProviderId[] = ["gemini", "deepseek", "openai"];
 
-function providers(): ProviderConf[] {
+export function providers(): ProviderConf[] {
   const env = process.env;
   return [
     {
@@ -151,7 +151,7 @@ const RawSchema = z.object({
   notes: z.string().nullish(),
 });
 
-function extractJson(content: string): unknown {
+export function extractJson(content: string): unknown {
   const s = content.replace(/```(?:json)?/gi, "").trim();
   const a = s.indexOf("{");
   const b = s.lastIndexOf("}");
@@ -185,39 +185,40 @@ function toResult(conf: ProviderConf, model: string, raw: z.infer<typeof RawSche
   };
 }
 
-class ProviderError extends Error {}
+export class ProviderError extends Error {}
 
 type Attempt = Failure & { model: string };
 
-function logFailure(conf: ProviderConf, model: string, format: string, f: Failure) {
-  // 写进 Vercel 的 log：方便查哪个模型、为什么失败（不会记录 key 或照片）
-  console.error(`[ocr] ${conf.id} ${model} (${format}) ${f.kind}${f.status ? ` HTTP ${f.status}` : ""}${f.detail ? `: ${f.detail}` : ""}`);
+function logFailure(tag: string, conf: ProviderConf, model: string, format: string, f: Failure) {
+  // 写进 Vercel 的 log：方便查哪个模型、为什么失败（不会记录 key、照片或录音）
+  console.error(`[${tag}] ${conf.id} ${model} (${format}) ${f.kind}${f.status ? ` HTTP ${f.status}` : ""}${f.detail ? `: ${f.detail}` : ""}`);
+}
+
+/** 叫 AI 做一件事（读 receipt、听录音……）：说明、给 AI 的内容、要的 JSON 样子、怎么把回传变成结果 */
+export interface AiTask<T> {
+  /** log 的标签，也是 json_schema 的名字 */
+  name: string;
+  system: string;
+  user: (conf: ProviderConf) => unknown[];
+  schema: Record<string, unknown>;
+  parse: (json: unknown, model: string) => T;
 }
 
 /** 一家 AI：按顺序试模型和 JSON 格式，哪个能用就用哪个；全部失败就说清楚每个模型的原因 */
-async function readWith(conf: ProviderConf, imageDataUrl: string): Promise<ReadResult> {
+export async function runTask<T>(conf: ProviderConf, task: AiTask<T>): Promise<T> {
   const attempts: Attempt[] = [];
   for (const model of conf.models) {
     for (const format of conf.formats) {
       const body: Record<string, unknown> = {
         model,
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Read this receipt and reply with the JSON object only." },
-              {
-                type: "image_url",
-                image_url: conf.imageDetail ? { url: imageDataUrl, detail: "high" } : { url: imageDataUrl },
-              },
-            ],
-          },
+          { role: "system", content: task.system },
+          { role: "user", content: task.user(conf) },
         ],
         ...conf.extra,
       };
       if (format === "json_schema") {
-        body.response_format = { type: "json_schema", json_schema: { name: "receipt", strict: true, schema: SCHEMA } };
+        body.response_format = { type: "json_schema", json_schema: { name: task.name, strict: true, schema: task.schema } };
       } else if (format === "json_object") {
         body.response_format = { type: "json_object" };
       }
@@ -231,12 +232,12 @@ async function readWith(conf: ProviderConf, imageDataUrl: string): Promise<ReadR
         });
       } catch (e) {
         const f: Failure = { kind: e instanceof Error && e.name === "TimeoutError" ? "timeout" : "network" };
-        logFailure(conf, model, format, f);
+        logFailure(task.name, conf, model, format, f);
         throw new ProviderError(failureText(f));
       }
       if (!res.ok) {
         const f = classifyHttp(res.status, (await res.text()).slice(0, 2000));
-        logFailure(conf, model, format, f);
+        logFailure(task.name, conf, model, format, f);
         attempts.push({ ...f, model });
         if (f.kind === "key" || f.kind === "balance") throw new ProviderError(summarizeAttempts(attempts));
         if (f.kind === "format" || f.kind === "rejected") continue; // 换一种 JSON 格式再试
@@ -246,14 +247,14 @@ async function readWith(conf: ProviderConf, imageDataUrl: string): Promise<ReadR
       const content = data?.choices?.[0]?.message?.content;
       if (!content || !content.trim()) {
         attempts.push({ kind: "empty", model });
-        logFailure(conf, model, format, { kind: "empty" });
+        logFailure(task.name, conf, model, format, { kind: "empty" });
         continue; // DeepSeek 文件说 JSON 模式偶尔会回空白：换个格式再试
       }
       try {
-        return toResult(conf, model, RawSchema.parse(extractJson(content)));
+        return task.parse(extractJson(content), model);
       } catch {
         attempts.push({ kind: "unreadable", model });
-        logFailure(conf, model, format, { kind: "unreadable" });
+        logFailure(task.name, conf, model, format, { kind: "unreadable" });
         continue;
       }
     }
@@ -294,7 +295,7 @@ async function pingModel(conf: ProviderConf, model: string): Promise<{ ok: true 
     });
     if (res.ok) return { ok: true };
     const failure = classifyHttp(res.status, (await res.text()).slice(0, 2000));
-    logFailure(conf, model, "check", failure);
+    logFailure("ocr", conf, model, "check", failure);
     return { ok: false, failure };
   } catch (e) {
     return { ok: false, failure: { kind: e instanceof Error && e.name === "TimeoutError" ? "timeout" : "network" } };
@@ -390,6 +391,19 @@ function mockChecks(): ProviderCheck[] {
   ];
 }
 
+function receiptTask(conf: ProviderConf, imageDataUrl: string): AiTask<ReadResult> {
+  return {
+    name: "receipt",
+    system: SYSTEM_PROMPT,
+    user: (c) => [
+      { type: "text", text: "Read this receipt and reply with the JSON object only." },
+      { type: "image_url", image_url: c.imageDetail ? { url: imageDataUrl, detail: "high" } : { url: imageDataUrl } },
+    ],
+    schema: SCHEMA,
+    parse: (json, model) => toResult(conf, model, RawSchema.parse(json)),
+  };
+}
+
 /** 主入口：有设 key 的 AI 同时读，再互相比对 */
 export async function readReceipt(imageDataUrl: string): Promise<ReceiptDraft> {
   const mock = process.env.OCR_MOCK;
@@ -404,7 +418,7 @@ export async function readReceipt(imageDataUrl: string): Promise<ReceiptDraft> {
     outcomes = await Promise.all(
       enabled.map(async (p): Promise<ProviderOutcome> => {
         try {
-          return { provider: p.id, label: p.label, ok: true, result: await readWith(p, imageDataUrl) };
+          return { provider: p.id, label: p.label, ok: true, result: await runTask(p, receiptTask(p, imageDataUrl)) };
         } catch (e) {
           const msg = e instanceof ProviderError ? e.message : "出错了";
           if (!(e instanceof ProviderError)) console.error(`OCR ${p.id}`, e);

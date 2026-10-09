@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, Check, ImageUp, PencilLine } from "lucide-react";
+import { Camera, Check, ImageUp, Mic, PencilLine } from "lucide-react";
 import { api, ApiError } from "@/lib/client/api";
 import { compressImage } from "@/lib/client/image";
 import { centsToPlain } from "@/lib/money";
@@ -13,6 +13,7 @@ import { ItemsEditor } from "@/components/ItemsEditor";
 import { PeoplePicker } from "@/components/PeoplePicker";
 import { Button, Group, Notice, PageHeader, Row, Spinner } from "@/components/ui";
 import { selectClass, toast } from "@/components/ui-client";
+import { VoiceInput } from "./VoiceInput";
 
 interface ReceiptDraftResponse {
   merchant: string | null;
@@ -25,9 +26,11 @@ interface ReceiptDraftResponse {
   warnings: string[];
   crossCheck: CrossCheck;
   raw: { outcomes: ProviderOutcome[] };
+  /** 用说的：AI 听到的内容 */
+  transcript?: string | null;
 }
 
-type Step = "photo" | "reading" | "review" | "people";
+type Step = "photo" | "reading" | "voice" | "review" | "people";
 
 export function NewBillFlow({
   me,
@@ -68,21 +71,7 @@ export function NewBillFlow({
       return;
     }
     try {
-      const r = await api<ReceiptDraftResponse>("/api/receipt/read", { body: { image: dataUrl } });
-      setOcr(r);
-      setExtraItems(r.crossCheck.extraItems);
-      setDraft(
-        draftFromParts({
-          title: r.merchant ?? "",
-          date: r.date ?? today,
-          items: r.items,
-          charges: r.charges,
-          totalCents: r.totalCents,
-          printedSubtotalCents: r.printedSubtotalCents,
-          notes: r.crossCheck.itemNotes,
-        }),
-      );
-      setStep("review");
+      applyRead(await api<ReceiptDraftResponse>("/api/receipt/read", { body: { image: dataUrl } }));
     } catch (e) {
       const msg = e instanceof Error ? e.message : "读不到 receipt";
       if (e instanceof ApiError && e.status === 503) {
@@ -96,6 +85,25 @@ export function NewBillFlow({
         setStep("photo");
       }
     }
+  }
+
+  /** AI 读好（receipt 或用说的）：填进核对画面 */
+  function applyRead(r: ReceiptDraftResponse) {
+    setOcr(r);
+    setExtraItems(r.crossCheck.extraItems);
+    setDraft(
+      draftFromParts({
+        title: r.merchant ?? "",
+        date: r.date ?? today,
+        items: r.items,
+        charges: r.charges,
+        totalCents: r.totalCents,
+        printedSubtotalCents: r.printedSubtotalCents,
+        notes: r.crossCheck.itemNotes,
+      }),
+    );
+    setStep("review");
+    window.scrollTo({ top: 0 });
   }
 
   function goPeople() {
@@ -201,6 +209,17 @@ export function NewBillFlow({
                     <PencilLine className="size-[18px]" strokeWidth={2} /> 手动输入
                   </Button>
                 </div>
+                <Button
+                  full
+                  className="mt-2"
+                  onClick={() => {
+                    setReadError(null);
+                    setImage(null);
+                    setStep("voice");
+                  }}
+                >
+                  <Mic className="size-[18px]" strokeWidth={2} /> 没有 receipt？用说的
+                </Button>
                 {readError && (
                   <div className="mt-4">
                     <Notice tone="error">{readError}</Notice>
@@ -210,10 +229,24 @@ export function NewBillFlow({
             )}
           </div>
         </>
+      ) : step === "voice" ? (
+        <>
+          <PageHeader title="用说的" subtitle="没有 receipt 的时候，讲出吃了什么、多少钱，AI 帮你整理。" />
+          <VoiceInput<ReceiptDraftResponse> onResult={applyRead} onBack={() => setStep("photo")} />
+        </>
       ) : step === "review" ? (
         <>
-          <PageHeader title="核对 receipt" subtitle="AI 读的可能会错，对一下 item 和总额。" />
+          <PageHeader
+            title={ocr?.transcript !== undefined ? "核对一下" : "核对 receipt"}
+            subtitle={ocr?.transcript !== undefined ? "AI 听的可能会错，对一下 item、价钱和总额。" : "AI 读的可能会错，对一下 item 和总额。"}
+          />
           <div className="px-4 pb-6">
+            {ocr?.transcript && (
+              <div className="card mt-6 rounded-[24px] bg-surface px-5 py-4">
+                <p className="label-mono text-label-2">AI 听到的</p>
+                <p className="mt-2 text-[15px] leading-[22px]">「{ocr.transcript}」</p>
+              </div>
+            )}
             {image && (
               <details className="card mt-6 rounded-[24px] bg-surface px-5 py-4">
                 <summary className="label-mono cursor-pointer text-label">看 receipt 照片</summary>
@@ -223,6 +256,7 @@ export function NewBillFlow({
             )}
             {ocr && (
               <CrossCheckBanner
+                voice={ocr.transcript !== undefined}
                 check={ocr.crossCheck}
                 extraItems={extraItems}
                 onAddExtra={(e) => {

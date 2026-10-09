@@ -10,10 +10,13 @@ export function CrossCheckBanner({
   check,
   extraItems,
   onAddExtra,
+  voice = false,
 }: {
   check: CrossCheck;
   extraItems: (ReadItem & { from: string })[];
   onAddExtra: (item: ReadItem & { from: string }) => void;
+  /** 用说的 / 打字记的：没有 receipt 可以对 */
+  voice?: boolean;
 }) {
   const tone = {
     match: { bg: "bg-forest text-white", Icon: Check },
@@ -49,7 +52,7 @@ export function CrossCheckBanner({
           </ul>
           {check.totals && (
             <p className="tabular mt-3 text-[13px] leading-[18px] font-semibold">
-              总额读得不一样：{check.totals.map((t) => `${t.label} ${formatRM(t.totalCents)}`).join("、")}。请看 receipt 上最后付的数目。
+              总额读得不一样：{check.totals.map((t) => `${t.label} ${formatRM(t.totalCents)}`).join("、")}。{voice ? "请对一下你说的总共多少。" : "请看 receipt 上最后付的数目。"}
             </p>
           )}
         </div>
@@ -58,7 +61,7 @@ export function CrossCheckBanner({
       {extraItems.length > 0 && (
         <div className="mt-4 border-t border-current/20 pt-4">
           <p className="text-[13px] leading-[18px] opacity-90">
-            {extraItems[0].from} 还读到这些，{check.chosenLabel} 没有。是 receipt 上有的就加进来：
+            {extraItems[0].from} 还读到这些，{check.chosenLabel} 没有。{voice ? "是你有说的就加进来：" : "是 receipt 上有的就加进来："}
           </p>
           <ul className="mt-3 space-y-2">
             {extraItems.map((e, i) => (
