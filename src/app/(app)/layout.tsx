@@ -1,23 +1,12 @@
-import { redirect, unstable_rethrow } from "next/navigation";
-import { currentUser, hasAnyUser } from "@/lib/server/auth";
 import { TabBar } from "@/components/TabBar";
 import { Toaster } from "@/components/ui-client";
-import { SetupProblem } from "@/components/SetupProblem";
 import { PushSync } from "@/components/PushSync";
 
 export const dynamic = "force-dynamic";
 
-export default async function AppLayout({ children }: LayoutProps<"/">) {
-  try {
-    const user = await currentUser();
-    if (!user) {
-      if (!(await hasAnyUser())) redirect("/setup");
-      redirect("/login");
-    }
-  } catch (e) {
-    unstable_rethrow(e); // redirect() 要让它通过
-    return <SetupProblem error={e} />;
-  }
+// 这里不等资料库检查登入：外框和骨架画面马上送出去，打开 app 不会先白屏。
+// 每一页自己用 pageUser() 检查（没登入转去 /login，没有帐号的话登入页再转去 /setup）。
+export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="mx-auto min-h-dvh max-w-lg pb-[calc(104px+env(safe-area-inset-bottom))]">
       {children}

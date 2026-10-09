@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { api } from "@/lib/client/api";
 import { centsToPlain, formatRM, parseRM } from "@/lib/money";
 import type { PaymentVerdict } from "@/lib/ledger";
@@ -28,6 +28,7 @@ function PaymentSheetInner({ onClose, from, to, suggestedCents, onSaved }: Props
   const [note, setNote] = useState("");
   const [preview, setPreview] = useState<{ cents: number; verdict: PaymentVerdict; alreadyAuto: string | null } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [, startTransition] = useTransition();
 
   const cents = parseRM(amount);
   useEffect(() => {
@@ -60,8 +61,11 @@ function PaymentSheetInner({ onClose, from, to, suggestedCents, onSaved }: Props
         body: { fromPersonId: from.id, toPersonId: to.id, amountCents: cents, paidAt, note: note || null },
       });
       toast(`已记录 ${pairLabel(from.name, to.name)} ${formatRM(cents)}`);
-      onSaved();
-      onClose();
+      // 新的数字拿到了才一起关掉：关的那一刻画面已经更新，不会先看到旧数字再跳
+      startTransition(() => {
+        onSaved();
+        onClose();
+      });
     } catch (e) {
       toast(e instanceof Error ? e.message : "存不到", "error");
       setSaving(false);

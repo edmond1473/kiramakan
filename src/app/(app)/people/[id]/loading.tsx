@@ -1,3 +1,5 @@
 import { PageSkeleton } from "@/components/PageSkeleton";
 
-export default PageSkeleton;
+export default function Loading() {
+  return <PageSkeleton back />;
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { UserPlus } from "lucide-react";
 import { api } from "@/lib/client/api";
@@ -14,17 +14,21 @@ export function AddFriendButton() {
   const [tngName, setTngName] = useState("");
   const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
+  const [refreshing, startTransition] = useTransition();
 
   async function save() {
     setBusy(true);
     try {
       await api("/api/people", { body: { name, tngName: tngName || null, phone: phone || null } });
       toast(`已加 ${name}`);
-      setOpen(false);
-      setName("");
-      setTngName("");
-      setPhone("");
-      router.refresh();
+      // 朋友列表更新好了才一起关掉：关的那一刻新朋友已经在列表上
+      startTransition(() => {
+        setOpen(false);
+        setName("");
+        setTngName("");
+        setPhone("");
+        router.refresh();
+      });
     } catch (e) {
       toast(e instanceof Error ? e.message : "存不到", "error");
     } finally {
@@ -42,7 +46,7 @@ export function AddFriendButton() {
         onClose={() => setOpen(false)}
         title="加朋友"
         footer={
-          <Button variant="filled" size="lg" full loading={busy} disabled={!name.trim()} onClick={save}>
+          <Button variant="filled" size="lg" full loading={busy || refreshing} disabled={!name.trim()} onClick={save}>
             保存
           </Button>
         }
