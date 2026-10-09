@@ -7,6 +7,8 @@ const g = globalThis as unknown as {
   __kmSchema?: Promise<void>;
 };
 
+type PgOptions = NonNullable<Parameters<typeof postgres>[1]>;
+
 function makeClient(): postgres.Sql {
   const url = process.env.DATABASE_URL;
   if (!url) {
@@ -20,7 +22,7 @@ function makeClient(): postgres.Sql {
     }
   })();
   const local = host === "localhost" || host === "127.0.0.1" || host === "";
-  return postgres(url, {
+  const options: PgOptions = {
     max: local ? 5 : 3,
     idle_timeout: 20,
     connect_timeout: 15,
@@ -28,7 +30,16 @@ function makeClient(): postgres.Sql {
     ssl: local ? false : "require",
     onnotice: () => {},
     transform: { undefined: null },
-  });
+  };
+  // 平常的查询：一条连接一次只跑一个，不连发（pipelining）。
+  // 经过 Supabase pooler（transaction mode）时，连发的查询结果会送错给别的查询，剩下的永远等不到回应。
+  // （max_pipeline 是 postgres.js 有的选项，只是 type 没写进去）
+  const sql = postgres(url, { ...options, max_pipeline: 0 } as PgOptions);
+  // 交易另外用一个照常设定的 client：postgres.js 的 begin 要靠连发那段逻辑把连接留给交易，
+  // max_pipeline: 0 会让它报 UNSAFE_TRANSACTION。交易里 pooler 一直用同一个资料库连接，连发没问题。
+  const txSql = postgres(url, options);
+  sql.begin = txSql.begin;
+  return sql;
 }
 
 export function rawSql(): postgres.Sql {
