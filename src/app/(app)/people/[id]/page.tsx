@@ -33,6 +33,7 @@ export default async function PersonPage(props: PageProps<"/people/[id]">) {
       paid: c.paid,
       remaining: c.remaining,
       status: c.status,
+      unverified: c.unverified,
     }));
 
   return (

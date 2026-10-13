@@ -72,6 +72,9 @@ export interface PaymentRow {
   source: string;
   note: string | null;
   createdAt: string;
+  /** false = 朋友按了「去付款」，还没用 TNG 交易记录核对 */
+  verified: boolean;
+  billId: string | null;
 }
 
 export interface World {
@@ -116,7 +119,7 @@ export async function loadWorld(q?: postgres.Sql | postgres.TransactionSql): Pro
     sql`select id, bill_id, position, label, amount_cents from bill_charges order by bill_id, position`,
     sql`select bill_id, person_id from bill_participants order by added_at`,
     sql`select item_id, person_id, units from item_shares`,
-    sql`select id, from_person_id, to_person_id, amount_cents, paid_at, source, note, created_at
+    sql`select id, from_person_id, to_person_id, amount_cents, paid_at, source, note, created_at, verified, bill_id
         from payments order by paid_at, created_at`,
   ]);
 
@@ -172,6 +175,8 @@ export async function loadWorld(q?: postgres.Sql | postgres.TransactionSql): Pro
     source: r.source,
     note: r.note,
     createdAt: iso(r.created_at),
+    verified: r.verified,
+    billId: r.bill_id,
   }));
 
   const itemsByBill = groupBy(itemRows, (i) => i.billId);
@@ -220,7 +225,7 @@ export function chargesBetween(w: World, debtorId: string, creditorId: string): 
 export function paymentsBetween(w: World, fromId: string, toId: string): PaymentLite[] {
   return w.payments
     .filter((p) => p.fromPersonId === fromId && p.toPersonId === toId)
-    .map((p) => ({ id: p.id, amount: p.amountCents, paidAt: p.paidAt }));
+    .map((p) => ({ id: p.id, amount: p.amountCents, paidAt: p.paidAt, billId: p.billId, verified: p.verified }));
 }
 
 export function ledgerBetween(w: World, debtorId: string, creditorId: string): PairLedger {
@@ -278,6 +283,8 @@ export interface BillParticipantView {
   paid: number;
   remaining: number;
   status: "payer" | "paid" | "forgot_tax" | "partial" | "unpaid" | "none";
+  /** paid 里面还没核对的部分（按了「去付款」，等 TNG 交易记录） */
+  unverified: number;
 }
 
 export interface BillItemView {
@@ -299,6 +306,8 @@ export interface PayeeInfo {
   qrPayload: string | null;
   qrAmountEnabled: boolean;
   payPhone: string | null;
+  /** 有 KiraMakan 帐号：朋友按「去付款」先算付了，晚上用 TNG 交易记录核对 */
+  hasAccount: boolean;
 }
 
 export interface BillView {
@@ -327,6 +336,7 @@ export function payeeInfo(w: World, personId: string): PayeeInfo {
     qrPayload: p?.qrPayload ?? null,
     qrAmountEnabled: p?.qrAmountEnabled ?? false,
     payPhone: p?.payPhone ?? p?.phone ?? null,
+    hasAccount: !!p?.userId,
   };
 }
 
@@ -367,10 +377,10 @@ export function billView(w: World, billId: string): BillView | null {
     const amt = a.people.get(pid) ?? { preTax: 0, owed: 0 };
     const name = w.people.get(pid)?.name ?? "?";
     if (pid === b.payerPersonId) {
-      return { personId: pid, name, isPayer: true, ...amt, paid: 0, remaining: 0, status: "payer" };
+      return { personId: pid, name, isPayer: true, ...amt, paid: 0, remaining: 0, status: "payer", unverified: 0 };
     }
     if (amt.owed <= 0) {
-      return { personId: pid, name, isPayer: false, ...amt, paid: 0, remaining: 0, status: "none" };
+      return { personId: pid, name, isPayer: false, ...amt, paid: 0, remaining: 0, status: "none", unverified: 0 };
     }
     const led = ledgerBetween(w, pid, b.payerPersonId);
     const st = led.charges.find((c) => c.billId === b.id);
@@ -382,6 +392,7 @@ export function billView(w: World, billId: string): BillView | null {
       paid: st?.paid ?? 0,
       remaining: st?.remaining ?? amt.owed,
       status: st?.status ?? "unpaid",
+      unverified: st?.unverified ?? 0,
     };
   });
 

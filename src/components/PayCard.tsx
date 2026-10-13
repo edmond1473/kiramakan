@@ -22,10 +22,13 @@ export function PayCard({
   payee,
   amountCents,
   breakdown,
+  onOpenTng,
 }: {
   payee: Payee;
   amountCents: number;
   breakdown?: { preTax: number; owed: number } | null;
+  /** 按「打开 TNG」的那一刻（先算他付了，等核对）；要在跳走之前叫 */
+  onOpenTng?: () => void;
 }) {
   const qr = useMemo(() => {
     if (!payee.qrPayload) return null;
@@ -62,6 +65,7 @@ export function PayCard({
               size="lg"
               full
               onClick={() => {
+                onOpenTng?.();
                 copyAndOpenTng(amountText, platform);
                 toast(`已复制 ${amountText}，到 TNG 贴上就好`);
               }}

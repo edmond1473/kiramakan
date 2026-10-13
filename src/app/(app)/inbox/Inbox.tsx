@@ -161,8 +161,18 @@ export function Inbox({
                 </p>
                 {r.verdict && (
                   <div className="mt-1.5">
-                    <Tag tone={r.verdictKind === "forgot_tax" ? "flare" : r.verdictKind === "settles_all" ? "forest" : "mist"}>
-                      {r.verdictKind === "forgot_tax" ? "少给 tax" : r.verdictKind === "settles_all" ? "还清 ✓" : shortVerdict(r.verdict)}
+                    <Tag
+                      tone={
+                        r.verdictKind === "forgot_tax" ? "flare" : r.verdictKind === "settles_all" || r.verdictKind === "claim" ? "forest" : "mist"
+                      }
+                    >
+                      {r.verdictKind === "forgot_tax"
+                        ? "少给 tax"
+                        : r.verdictKind === "settles_all"
+                          ? "还清 ✓"
+                          : r.verdictKind === "claim"
+                            ? "核对好 ✓"
+                            : shortVerdict(r.verdict)}
                     </Tag>
                   </div>
                 )}

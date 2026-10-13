@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isIncomingTransfer, parseStatement, sameName, type PdfText } from "../tng-statement";
+import { isIncomingTransfer, parseStatement, pdfDate, periodRange, sameName, type PdfText } from "../tng-statement";
 
 // 照 TNG 导出的 PDF 排版做的假资料（y 越大越上面；每一栏从固定的 x 开始）
 const X = { date: 20, status: 80, type: 140, ref: 230, desc: 295, details: 460, amount: 658, balance: 750 };
@@ -92,5 +92,21 @@ describe("sameName", () => {
     expect(sameName("AHMAD BIN ALI", "AHMED BIN ALI")).toBe(true);
     expect(sameName("AHMAD BIN ALI", "AHMAD BIN ABU")).toBe(false);
     expect(sameName("TAN AH KOW", "TAN AH")).toBe(false);
+  });
+});
+
+describe("periodRange / pdfDate", () => {
+  it("读懂 PDF 上的日期范围", () => {
+    expect(periodRange("14 September 2026 - 13 October 2026")).toEqual({ start: "2026-09-14", end: "2026-10-13" });
+    expect(periodRange("1 Oct 2026 - 2 Oct 2026")).toEqual({ start: "2026-10-01", end: "2026-10-02" });
+    expect(periodRange(null)).toBeNull();
+    expect(periodRange("whatever")).toBeNull();
+  });
+
+  it("读懂 PDF 的导出时间（马来西亚时间）", () => {
+    expect(pdfDate("D:20261013105301+08'00'")).toBe("2026-10-13T02:53:01.000Z");
+    expect(pdfDate("D:20261013105301Z")).toBe("2026-10-13T10:53:01.000Z");
+    expect(pdfDate(undefined)).toBeNull();
+    expect(pdfDate("garbage")).toBeNull();
   });
 });

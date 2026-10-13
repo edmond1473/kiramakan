@@ -188,6 +188,10 @@ create index if not exists incoming_user_idx on incoming_payments (user_id, rece
 alter table incoming_payments add column if not exists tng_ref text;
 create unique index if not exists incoming_ref_idx on incoming_payments (user_id, tng_ref);
 alter table users add column if not exists statement_since date;
+-- 朋友按「去付款」先当作付了（verified = false，待核对），晚上的 TNG 交易记录有这笔才算数；
+-- bill_id：在哪一餐按的，那一餐先算
+alter table payments add column if not exists verified boolean not null default true;
+alter table payments add column if not exists bill_id uuid references bills(id) on delete set null;
 
 create table if not exists push_subscriptions (
   id uuid primary key default gen_random_uuid(),

@@ -252,7 +252,7 @@ export function BillAdmin({
               trailing={
                 <div className="flex flex-col items-end gap-1">
                   <Money cents={p.owed} className="text-[16px] font-semibold" />
-                  <StatusChip status={p.status} remaining={p.remaining} />
+                  <StatusChip status={p.status} remaining={p.remaining} verifying={p.unverified > 0} />
                 </div>
               }
             >
@@ -355,7 +355,7 @@ export function BillAdmin({
                     这餐要付 <span className="font-semibold">{formatRM(p.owed)}</span>（item {formatRM(p.preTax)}）
                   </p>
                   <div className="mt-2">
-                    <StatusChip status={p.status} remaining={p.remaining} />
+                    <StatusChip status={p.status} remaining={p.remaining} verifying={p.unverified > 0} />
                   </div>
                 </div>
                 {(iAmPayer || me.isAdmin) && p.owed > 0 && (

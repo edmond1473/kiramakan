@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Lock, UserPlus } from "lucide-react";
 import type { BillView } from "@/lib/server/world";
 import { api } from "@/lib/client/api";
@@ -51,6 +51,19 @@ export function FriendBill({ token, initialView }: { token: string; initialView:
   const [joinName, setJoinName] = useState("");
   const [joining, setJoining] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
+  // 从 TNG 回来：拿最新的状况
+  useEffect(() => {
+    const onShow = () => {
+      if (document.visibilityState !== "visible") return;
+      api<BillView>(`/api/share/${token}`)
+        .then(setView)
+        .catch(() => {});
+    };
+    document.addEventListener("visibilitychange", onShow);
+    return () => document.removeEventListener("visibilitychange", onShow);
+  }, [token]);
 
   const me = storedMe && view.participants.some((p) => p.personId === storedMe) ? storedMe : null;
 
@@ -80,6 +93,29 @@ export function FriendBill({ token, initialView }: { token: string; initialView:
     }
   }
 
+  /** 按了「去付款」：先算你付了（待核对）。不等结果：跳去 TNG 之前送出去就好 */
+  function markPaying() {
+    if (!me || !meP || meP.isPayer || !view.payer.hasAccount || meP.remaining <= 0) return;
+    api<BillView>(`/api/share/${token}/pay`, { body: { personId: me }, keepalive: true })
+      .then(setView)
+      .catch(() => {
+        // 记不到也没关系：晚上的 TNG 交易记录有这笔，一样会记好
+      });
+  }
+
+  async function cancelPaying() {
+    if (!me) return;
+    setCancelling(true);
+    try {
+      setView(await api<BillView>(`/api/share/${token}/pay`, { method: "DELETE", body: { personId: me } }));
+      setPayOpen(false);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "取消不到，再试一次", "error");
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   async function join() {
     const n = joinName.trim();
     if (!n) return;
@@ -97,7 +133,9 @@ export function FriendBill({ token, initialView }: { token: string; initialView:
     }
   }
 
-  const payAmount = meP ? (meP.remaining > 0 ? meP.remaining : meP.owed) : 0;
+  const payAmount = meP ? (meP.remaining > 0 ? meP.remaining : meP.unverified > 0 ? meP.unverified : meP.owed) : 0;
+  /** 按了「去付款」，等付钱的人用 TNG 交易记录核对 */
+  const verifying = !!meP && meP.status === "paid" && meP.unverified > 0;
   const unpaidOthers = others.filter((p) => p.owed > 0 && p.status !== "paid");
 
   return (
@@ -211,7 +249,7 @@ export function FriendBill({ token, initialView }: { token: string; initialView:
               trailing={
                 <div className="flex flex-col items-end gap-1">
                   {p.owed > 0 && <Money cents={p.owed} className="text-[16px] font-semibold" />}
-                  <StatusChip status={p.status} remaining={p.remaining} />
+                  <StatusChip status={p.status} remaining={p.remaining} verifying={p.unverified > 0} />
                 </div>
               }
             >
@@ -235,7 +273,9 @@ export function FriendBill({ token, initialView }: { token: string; initialView:
             ) : (
               <>
                 <div className="min-w-0 flex-1 py-1">
-                  <p className="label-mono text-white/60">{meP.status === "paid" ? "你这餐" : "你要付"}</p>
+                  <p className="label-mono truncate text-white/60">
+                    {verifying ? `等 ${view.payer.name} 核对` : meP.status === "paid" ? "你这餐" : "你要付"}
+                  </p>
                   {meP.status === "paid" ? (
                     <p className="display mt-1 text-[26px] text-volt">已付 ✓</p>
                   ) : (
@@ -245,14 +285,24 @@ export function FriendBill({ token, initialView }: { token: string; initialView:
                     </div>
                   )}
                 </div>
+                {verifying && (
+                  <button
+                    onClick={cancelPaying}
+                    disabled={cancelling}
+                    className="press h-11 shrink-0 rounded-full border-[1.5px] border-white/50 px-4 text-[14px] font-semibold text-white active:bg-white/10 disabled:opacity-50"
+                  >
+                    其实还没付
+                  </button>
+                )}
                 {meP.status !== "paid" && meP.owed > 0 && (
                   <Button
                     variant="filled"
                     size="lg"
                     className="px-6"
                     onClick={() => {
-                      // 一按：复制金额 + 打开 TNG；回来时付款画面（QR、电话）已经开着
+                      // 一按：先算你付了 + 复制金额 + 打开 TNG；回来时付款画面（QR、电话）已经开着
                       setPayOpen(true);
+                      markPaying();
                       if (platform !== "other") {
                         copyAndOpenTng(centsToPlain(payAmount), platform);
                         toast(`已复制 ${centsToPlain(payAmount)}，到 TNG 贴上就好`);
@@ -280,8 +330,13 @@ export function FriendBill({ token, initialView }: { token: string; initialView:
               payee={view.payer}
               amountCents={payAmount}
               breakdown={meP.paid === 0 ? { preTax: meP.preTax, owed: meP.owed } : null}
+              onOpenTng={markPaying}
             />
-            <p className="mt-3 px-1 text-[12px] leading-[17px] text-label-2">付了之后不用回来按什么，{view.payer.name} 那边会记录。</p>
+            <p className="mt-3 px-1 text-[12px] leading-[17px] text-label-2">
+              {view.payer.hasAccount
+                ? `按了「去付款」就先算你付了。${view.payer.name} 每晚会用 TNG 交易记录核对一次，没有这笔的话会改回未付。`
+                : `付了之后不用回来按什么，${view.payer.name} 那边会记录。`}
+            </p>
           </div>
         )}
       </Sheet>

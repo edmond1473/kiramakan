@@ -9,7 +9,8 @@ export class ApiError extends Error {
   }
 }
 
-export async function api<T = unknown>(url: string, init?: { method?: string; body?: unknown }): Promise<T> {
+/** keepalive：马上要跳去别的 app（例如 TNG）也会送到 */
+export async function api<T = unknown>(url: string, init?: { method?: string; body?: unknown; keepalive?: boolean }): Promise<T> {
   let res: Response;
   try {
     res = await fetch(url, {
@@ -17,6 +18,7 @@ export async function api<T = unknown>(url: string, init?: { method?: string; bo
       headers: init?.body !== undefined ? { "content-type": "application/json" } : undefined,
       body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
       cache: "no-store",
+      keepalive: init?.keepalive,
     });
   } catch {
     throw new ApiError(0, "连不上网络，请再试一次");

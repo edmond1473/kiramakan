@@ -3,6 +3,7 @@ import { db } from "./db";
 import { HttpError, hashPassword, randomToken, type SessionUser } from "./auth";
 import { loadWorld, ledgerBetween } from "./world";
 import { classifyPayment, isSettled } from "../ledger";
+import { claimPreview, confirmClaims, todayMY } from "./claims";
 
 export interface ItemInputRow {
   id?: string;
@@ -245,13 +246,19 @@ export async function recordPayment(
   await assertPerson(input.fromPersonId);
   await assertPerson(input.toPersonId);
   const sql = await db();
-  const [p] = await sql`
-    insert into payments (from_person_id, to_person_id, amount_cents, paid_at, source, note, created_by)
-    values (${input.fromPersonId}, ${input.toPersonId}, ${input.amountCents},
-            coalesce(${input.paidAt ?? null}::timestamptz, now()), ${input.source ?? "manual"},
-            ${input.note?.trim() || null}, ${user.id})
-    returning id`;
-  return p.id as string;
+  return sql.begin(async (tx) => {
+    // 他按过「去付款」、你又记同样的钱：就是那一笔，改成核对过，不记两次
+    const day = input.paidAt ? new Date(Date.parse(input.paidAt) + 8 * 3600_000).toISOString().slice(0, 10) : todayMY();
+    const claimId = await confirmClaims(tx, input.fromPersonId, input.toPersonId, input.amountCents, day, "you");
+    if (claimId) return claimId;
+    const [p] = await tx`
+      insert into payments (from_person_id, to_person_id, amount_cents, paid_at, source, note, created_by)
+      values (${input.fromPersonId}, ${input.toPersonId}, ${input.amountCents},
+              coalesce(${input.paidAt ?? null}::timestamptz, now()), ${input.source ?? "manual"},
+              ${input.note?.trim() || null}, ${user.id})
+      returning id`;
+    return p.id as string;
+  });
 }
 
 export async function previewPayment(fromPersonId: string, toPersonId: string, amountCents: number) {
@@ -268,6 +275,7 @@ export async function previewPayment(fromPersonId: string, toPersonId: string, a
     verdict: classifyPayment(amountCents, ledger),
     balance: ledger.balance,
     alreadyAuto: recent ? recent.paid_at.toISOString() : null,
+    claims: await claimPreview(fromPersonId, toPersonId, amountCents),
   };
 }
 

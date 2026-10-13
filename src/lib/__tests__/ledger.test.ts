@@ -31,6 +31,27 @@ describe("buildLedger", () => {
     const l = buildLedger([bill1], [pay(3000)]);
     expect(l.balance).toBe(-85);
   });
+
+  it("在哪一餐按「去付款」的，先算给那一餐（不会被拿去还更早的）", () => {
+    const l = buildLedger([bill1, bill2], [{ ...pay(1200), billId: "b2", verified: false }]);
+    expect(l.charges[0]).toMatchObject({ billId: "b1", paid: 0, status: "unpaid", unverified: 0 });
+    expect(l.charges[1]).toMatchObject({ billId: "b2", paid: 1200, status: "paid", unverified: 1200 });
+    expect(l.unverifiedPaid).toBe(1200);
+  });
+
+  it("指定那一餐付多了：多的照 FIFO 还其他餐", () => {
+    const l = buildLedger([bill1, bill2], [{ ...pay(1500), billId: "b2" }]);
+    expect(l.charges[1].paid).toBe(1200);
+    expect(l.charges[0].paid).toBe(300);
+  });
+
+  it("核对过的付款不算「待核对」", () => {
+    const l = buildLedger([bill1], [pay(2000, 1), { ...pay(915, 2), verified: false }]);
+    expect(l.charges[0]).toMatchObject({ status: "paid", unverified: 915 });
+    const done = buildLedger([bill1], [pay(2915)]);
+    expect(done.charges[0].unverified).toBe(0);
+    expect(done.unverifiedPaid).toBe(0);
+  });
 });
 
 describe("classifyPayment", () => {

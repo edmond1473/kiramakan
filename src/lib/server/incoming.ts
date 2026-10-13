@@ -7,6 +7,7 @@ import { classifyPayment, DEFAULT_TOLERANCE_CENTS, type PaymentVerdict } from ".
 import { formatRM } from "../money";
 import { matchSender, normalizeName, parseTngNotice, type Direction, type MatchCandidate, type ParsedNotice } from "../tng-notify";
 import { pendingText, recordedText, type NoticeText, type PendingReason } from "../remind";
+import { confirmClaims, todayMY } from "./claims";
 
 // TNG 进账通知 → 自动记账。
 // 规则：名字对得上、而且这笔钱不超过他欠你的 → 直接记好；
@@ -74,15 +75,13 @@ export async function loadAliases(q?: postgres.Sql | postgres.TransactionSql): P
   return m;
 }
 
-function owedBy(w: World, debtorId: string, creditorId: string): number {
-  return Math.max(0, ledgerBetween(w, debtorId, creditorId).balance);
-}
-
 export function candidatesFor(w: World, me: { personId: string }, aliases: Map<string, string[]>): MatchCandidate[] {
   const out: MatchCandidate[] = [];
   for (const p of w.people.values()) {
     if (p.id === me.personId) continue;
-    const owes = owedBy(w, p.id, me.personId) > tol;
+    // 按了「去付款」还没核对的，也当作还欠（名字分数一样时优先）
+    const ledger = ledgerBetween(w, p.id, me.personId);
+    const owes = ledger.balance > tol || ledger.unverifiedPaid > 0;
     if (!p.isActive && !owes) continue;
     out.push({
       personId: p.id,
@@ -154,7 +153,19 @@ export async function ingestNotice(user: SessionUser, rawText: string): Promise<
 
     let paymentId: string | null = null;
     let linkedManual = false;
-    if (a.outcome === "record" && a.personId && a.amountCents) {
+    let verdict: { message: string; kind: string } | null = a.verdict;
+    // 他按过「去付款」、金额对得上：就是那一笔，核对好
+    const claimId =
+      a.personId && a.amountCents && a.direction === "in"
+        ? await confirmClaims(tx, a.personId, user.personId, a.amountCents, todayMY())
+        : null;
+    if (claimId) {
+      a.outcome = "record";
+      a.reason = null;
+      verdict = { message: "他按了「去付款」，TNG 有这笔 ✓", kind: "claim" };
+      paymentId = claimId;
+      linkedManual = true; // 已经算过了，不用再通知
+    } else if (a.outcome === "record" && a.personId && a.amountCents) {
       // 你自己已经手动记过同一笔：接上那一笔，不要记两次
       const manual = await tx`
         select p.id from payments p
@@ -182,7 +193,7 @@ export async function ingestNotice(user: SessionUser, rawText: string): Promise<
         (user_id, raw_text, sender_name, amount_cents, direction, status, reason, from_person_id, payment_id,
          verdict, verdict_kind, resolved_at)
       values (${user.id}, ${text}, ${a.sender}, ${a.amountCents}, ${a.direction}, ${status}, ${a.reason},
-              ${a.personId}, ${paymentId}, ${a.verdict?.message ?? null}, ${a.verdict?.kind ?? null},
+              ${a.personId}, ${paymentId}, ${verdict?.message ?? null}, ${verdict?.kind ?? null},
               ${status === "pending" ? null : new Date()})
       returning id`;
 
@@ -276,12 +287,18 @@ export async function assignIncoming(user: SessionUser, id: string, personId: st
 
     const w = await loadWorld(tx);
     const verdict = classifyPayment(amount, ledgerBetween(w, personId, user.personId));
-    const [p] = await tx`
-      insert into payments (from_person_id, to_person_id, amount_cents, paid_at, source, note, raw, created_by)
-      values (${personId}, ${user.personId}, ${amount}, ${row.received_at}, 'tng', 'TNG（你确认的）', ${row.raw_text}, ${user.id})
-      returning id`;
+    // 他按过「去付款」、金额对得上：核对好那一笔，不再多记一笔
+    const day = new Date((row.received_at as Date).getTime() + 8 * 3600_000).toISOString().slice(0, 10);
+    let paymentId = await confirmClaims(tx, personId, user.personId, amount, day);
+    if (!paymentId) {
+      const [p] = await tx`
+        insert into payments (from_person_id, to_person_id, amount_cents, paid_at, source, note, raw, created_by)
+        values (${personId}, ${user.personId}, ${amount}, ${row.received_at}, 'tng', 'TNG（你确认的）', ${row.raw_text}, ${user.id})
+        returning id`;
+      paymentId = p.id as string;
+    }
     await tx`
-      update incoming_payments set status = 'recorded', from_person_id = ${personId}, payment_id = ${p.id},
+      update incoming_payments set status = 'recorded', from_person_id = ${personId}, payment_id = ${paymentId},
         verdict = ${verdict.message}, verdict_kind = ${verdict.kind}, resolved_at = now()
       where id = ${id}`;
 
@@ -323,6 +340,8 @@ export async function undoIncoming(user: SessionUser, id: string) {
       // 接上的是你手动记的那一笔：只解开，不删
       const [pay] = await tx`select source from payments where id = ${row.payment_id}`;
       if (pay && pay.source === "tng") await tx`delete from payments where id = ${row.payment_id}`;
+      // 接上的是朋友按的「去付款」：改回待核对
+      if (pay && pay.source === "claim") await tx`update payments set verified = false where id = ${row.payment_id}`;
     }
     await tx`
       update incoming_payments set status = 'pending', reason = 'undone', payment_id = null,

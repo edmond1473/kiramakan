@@ -248,7 +248,8 @@ export function Tag({ tone = "mist", children, className }: { tone?: TagTone; ch
 
 export type StatusKind = "payer" | "paid" | "forgot_tax" | "partial" | "unpaid" | "none";
 
-export function StatusChip({ status, remaining }: { status: StatusKind; remaining?: number }) {
+/** verifying：朋友按了「去付款」，还没用 TNG 交易记录核对 */
+export function StatusChip({ status, remaining, verifying }: { status: StatusKind; remaining?: number; verifying?: boolean }) {
   const map: Record<StatusKind, { text: string; tone: TagTone | null }> = {
     payer: { text: "付钱的人", tone: "outline" },
     none: { text: "没有吃", tone: null },
@@ -257,7 +258,7 @@ export function StatusChip({ status, remaining }: { status: StatusKind; remainin
     partial: { text: `还差 ${formatRM(remaining ?? 0)}`, tone: "volt" },
     unpaid: { text: "未付", tone: "ink" },
   };
-  const m = map[status];
+  const m = status === "paid" && verifying ? { text: "已付 · 待核对", tone: "indigo" as const } : map[status];
   if (!m.tone) return <span className="text-[13px] leading-[18px] text-label-3">{m.text}</span>;
   return <Tag tone={m.tone}>{m.text}</Tag>;
 }

@@ -20,6 +20,8 @@ interface ChargeV {
   paid: number;
   remaining: number;
   status: BillPayStatus;
+  /** 按了「去付款」还没核对的部分 */
+  unverified: number;
 }
 
 interface PaymentV {
@@ -29,6 +31,8 @@ interface PaymentV {
   source: string;
   note: string | null;
   incoming: boolean;
+  /** false = 朋友按了「去付款」，还没用 TNG 交易记录核对 */
+  verified: boolean;
 }
 
 export function PersonDetail({
@@ -197,6 +201,11 @@ export function PersonDetail({
                   {p.source === "offset" && " · 互抵"}
                   {p.note && p.source !== "offset" && ` · ${p.note}`}
                 </p>
+                {!p.verified && (
+                  <div className="mt-1.5">
+                    <Tag tone="indigo">待核对</Tag>
+                  </div>
+                )}
               </Row>
             ))}
           </Group>
@@ -245,7 +254,7 @@ function ChargeRow({ c }: { c: ChargeV }) {
         {formatDate(c.billDate)} · item {formatRM(c.preTax)}
       </p>
       <div className="mt-1.5">
-        <StatusChip status={c.status} remaining={c.remaining} />
+        <StatusChip status={c.status} remaining={c.remaining} verifying={c.unverified > 0} />
       </div>
     </Row>
   );

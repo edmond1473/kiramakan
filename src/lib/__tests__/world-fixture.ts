@@ -31,7 +31,7 @@ export function person(id: string, name: string, tngName: string | null = null, 
 export function buildWorld(
   people: PersonRow[],
   bills: FixtureBill[],
-  payments: { from: string; to: string; amount: number; at?: string; source?: string }[] = [],
+  payments: { from: string; to: string; amount: number; at?: string; source?: string; verified?: boolean; billId?: string }[] = [],
 ): World {
   const billRows: BillRow[] = bills.map((b, i) => ({
     id: b.id,
@@ -60,6 +60,8 @@ export function buildWorld(
     source: p.source ?? "manual",
     note: null,
     createdAt: p.at ?? `2026-10-10T12:00:0${i % 10}.000Z`,
+    verified: p.verified ?? true,
+    billId: p.billId ?? null,
   }));
 
   const itemsByBill = new Map<string, ItemRow[]>();

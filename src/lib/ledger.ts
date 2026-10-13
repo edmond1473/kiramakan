@@ -17,6 +17,10 @@ export interface PaymentLite {
   id: string;
   amount: number;
   paidAt: string; // ISO
+  /** 朋友在哪一餐按的「去付款」：先算给那一餐 */
+  billId?: string | null;
+  /** false = 朋友说付了，还没用 TNG 交易记录核对 */
+  verified?: boolean;
 }
 
 export type BillPayStatus = "paid" | "forgot_tax" | "partial" | "unpaid";
@@ -25,6 +29,8 @@ export interface ChargeState extends Charge {
   paid: number;
   remaining: number;
   status: BillPayStatus;
+  /** paid 里面还没核对的部分（朋友按了「去付款」） */
+  unverified: number;
 }
 
 export interface PairLedger {
@@ -32,6 +38,8 @@ export interface PairLedger {
   totalOwed: number;
   totalPaid: number;
   balance: number; // >0 还欠；<0 多给了（credit）
+  /** 还没核对的付款加起来 */
+  unverifiedPaid: number;
 }
 
 export function sortCharges(charges: Charge[]): Charge[] {
@@ -54,26 +62,48 @@ export function chargeStatus(
   return "partial";
 }
 
+/** 每一餐分到多少：有指定哪一餐的付款先给那一餐，其他的（和多出来的）从最旧的一餐还起 */
+function allocate(ordered: Charge[], payments: PaymentLite[]): number[] {
+  const paid = ordered.map(() => 0);
+  const index = new Map(ordered.map((c, i) => [c.billId, i]));
+  let pool = 0;
+  for (const p of payments) {
+    const i = p.billId ? index.get(p.billId) : undefined;
+    if (i === undefined) {
+      pool += p.amount;
+      continue;
+    }
+    const take = Math.max(0, Math.min(p.amount, ordered[i].owed - paid[i]));
+    paid[i] += take;
+    pool += p.amount - take;
+  }
+  ordered.forEach((c, i) => {
+    const take = Math.max(0, Math.min(pool, c.owed - paid[i]));
+    paid[i] += take;
+    pool -= take;
+  });
+  return paid;
+}
+
 export function buildLedger(
   charges: Charge[],
   payments: PaymentLite[],
   tol = DEFAULT_TOLERANCE_CENTS,
 ): PairLedger {
   const ordered = sortCharges(charges.filter((c) => c.owed > 0));
-  const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
-  let pool = totalPaid;
-  const states: ChargeState[] = ordered.map((c) => {
-    const paid = Math.max(0, Math.min(pool, c.owed));
-    pool -= paid;
-    return {
-      ...c,
-      paid,
-      remaining: c.owed - paid,
-      status: chargeStatus(c.owed, paid, c.preTax, tol),
-    };
-  });
+  const paid = allocate(ordered, payments);
+  const verifiedPaid = allocate(ordered, payments.filter((p) => p.verified !== false));
+  const states: ChargeState[] = ordered.map((c, i) => ({
+    ...c,
+    paid: paid[i],
+    remaining: c.owed - paid[i],
+    status: chargeStatus(c.owed, paid[i], c.preTax, tol),
+    unverified: Math.max(0, paid[i] - verifiedPaid[i]),
+  }));
   const totalOwed = ordered.reduce((s, c) => s + c.owed, 0);
-  return { charges: states, totalOwed, totalPaid, balance: totalOwed - totalPaid };
+  const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
+  const unverifiedPaid = payments.filter((p) => p.verified === false).reduce((s, p) => s + p.amount, 0);
+  return { charges: states, totalOwed, totalPaid, balance: totalOwed - totalPaid, unverifiedPaid };
 }
 
 export type PaymentVerdict =

@@ -27,6 +27,8 @@ export interface Statement {
   registeredName: string | null;
   period: string | null;
   rows: StatementRow[];
+  /** PDF 是几点导出的（PDF 资料里的 CreationDate，ISO）；这之后的转账不会在里面 */
+  createdAt?: string | null;
 }
 
 const COLS = ["Date", "Status", "Transaction Type", "Reference", "Description", "Details", "Amount (RM)", "Wallet Balance"] as const;
@@ -108,6 +110,27 @@ function rm(s: string): number | null {
   if (!m) return null;
   const cents = Math.round(Number(m[3].replace(/,/g, "")) * 100);
   return m[1] || m[2] ? -cents : cents;
+}
+
+const MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+
+/** 「14 September 2026 - 13 October 2026」→ 第一天、最后一天（YYYY-MM-DD）；看不懂就 null */
+export function periodRange(period: string | null): { start: string; end: string } | null {
+  const days = [...(period ?? "").matchAll(/(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/g)].map((m) => {
+    const month = MONTHS.findIndex((x) => x.startsWith(m[2].toLowerCase().slice(0, 3)));
+    return month < 0 ? null : `${m[3]}-${String(month + 1).padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  });
+  if (days.length !== 2 || !days[0] || !days[1]) return null;
+  return { start: days[0], end: days[1] };
+}
+
+/** PDF 的日期格式「D:20261013105301+08'00'」→ ISO；看不懂就 null */
+export function pdfDate(s: string | null | undefined): string | null {
+  const m = /^D:(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(?:([+-])(\d{2})'?(\d{2}))?/.exec(s ?? "");
+  if (!m) return null;
+  const zone = m[7] ? `${m[7]}${m[8]}:${m[9]}` : "Z";
+  const d = new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}${zone}`);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
 /** 进账说明的开头：看到这个就知道是 PDF 来的（只有日期、没有时间） */

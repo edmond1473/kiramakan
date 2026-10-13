@@ -7,6 +7,13 @@ import type { PaymentVerdict } from "@/lib/ledger";
 import { Button, Notice, formatWhen, todayMY } from "./ui";
 import { Field, Sheet, toast } from "./ui-client";
 
+interface Preview {
+  verdict: PaymentVerdict;
+  alreadyAuto: string | null;
+  /** 他按过「去付款」还没核对的：加起来多少、这个金额会不会接上 */
+  claims: { openTotal: number; matches: boolean };
+}
+
 interface Props {
   open: boolean;
   onClose: () => void;
@@ -26,7 +33,7 @@ function PaymentSheetInner({ onClose, from, to, suggestedCents, onSaved }: Props
   const [amount, setAmount] = useState(suggestedCents > 0 ? centsToPlain(suggestedCents) : "");
   const [date, setDate] = useState(todayMY());
   const [note, setNote] = useState("");
-  const [preview, setPreview] = useState<{ cents: number; verdict: PaymentVerdict; alreadyAuto: string | null } | null>(null);
+  const [preview, setPreview] = useState<{ cents: number } & Preview | null>(null);
   const [saving, setSaving] = useState(false);
   const [, startTransition] = useTransition();
 
@@ -36,10 +43,10 @@ function PaymentSheetInner({ onClose, from, to, suggestedCents, onSaved }: Props
     let alive = true;
     const t = setTimeout(async () => {
       try {
-        const r = await api<{ verdict: PaymentVerdict; alreadyAuto: string | null }>("/api/payments/preview", {
+        const r = await api<Preview>("/api/payments/preview", {
           body: { fromPersonId: from.id, toPersonId: to.id, amountCents: cents },
         });
-        if (alive) setPreview({ cents, verdict: r.verdict, alreadyAuto: r.alreadyAuto });
+        if (alive) setPreview({ cents, ...r });
       } catch {
         // 预览失败不影响记录
       }
@@ -51,6 +58,7 @@ function PaymentSheetInner({ onClose, from, to, suggestedCents, onSaved }: Props
   }, [cents, from.id, to.id]);
   const verdict = preview && preview.cents === cents ? preview.verdict : null;
   const alreadyAuto = preview && preview.cents === cents ? preview.alreadyAuto : null;
+  const claims = preview && preview.cents === cents ? preview.claims : null;
 
   async function save() {
     if (!cents || cents <= 0) return;
@@ -102,7 +110,20 @@ function PaymentSheetInner({ onClose, from, to, suggestedCents, onSaved }: Props
             TNG 通知已经自动记了一笔一样的 {formatRM(cents ?? 0)}（{formatWhen(alreadyAuto)}）。是同一笔的话不用再记。
           </Notice>
         )}
-        {verdict && <Notice tone={tone}>{verdict.message}</Notice>}
+        {claims?.matches ? (
+          <Notice tone="ok">
+            {from.name} 按过「去付款」，还没核对。就是那一笔的话，记了会直接当作核对好，不会多记一笔。
+          </Notice>
+        ) : (
+          <>
+            {claims && claims.openTotal > 0 && (
+              <Notice>
+                {from.name} 按过「去付款」{formatRM(claims.openTotal)}，还没核对（已经先算他付了，晚上 TNG 交易记录会对）。
+              </Notice>
+            )}
+            {verdict && <Notice tone={tone}>{verdict.message}</Notice>}
+          </>
+        )}
         <Field label="日期" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         <Field label="备注（可以不填）" value={note} onChange={(e) => setNote(e.target.value)} placeholder="例如 TNG 转账" />
       </div>

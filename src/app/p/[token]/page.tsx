@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { unstable_rethrow } from "next/navigation";
-import { isSettled, type ChargeState } from "@/lib/ledger";
+import { DEFAULT_TOLERANCE_CENTS, isSettled, type ChargeState } from "@/lib/ledger";
 import { formatRM } from "@/lib/money";
 import { allPairs, ledgerBetween, loadWorld, payeeInfo, type PayeeInfo } from "@/lib/server/world";
 import { BigMoney, Empty, Group, Hero, Money, Row, StatusChip, formatDate } from "@/components/ui";
 import { SetupProblem } from "@/components/SetupProblem";
-import { PayCard } from "@/components/PayCard";
+import { PersonPay } from "./PersonPay";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "我的账", robots: { index: false, follow: false } };
@@ -14,6 +14,8 @@ export const viewport: Viewport = { themeColor: "#fff100" };
 interface Section {
   payee: PayeeInfo;
   balance: number;
+  /** 按了「打开 TNG」还没核对的 */
+  unverified: number;
   open: (ChargeState & { title: string; shareToken: string | null })[];
 }
 
@@ -24,12 +26,16 @@ async function load(token: string): Promise<{ name: string; sections: Section[] 
   const creditors = [...new Set(allPairs(w).filter(([d]) => d === person.id).map(([, c]) => c))];
   const sections = creditors
     .map((c) => ({ c, ledger: ledgerBetween(w, person.id, c) }))
-    .filter((s) => s.ledger.balance > 0 && !isSettled(s.ledger.balance))
+    .filter(
+      (s) =>
+        (s.ledger.balance > 0 && !isSettled(s.ledger.balance)) || s.ledger.unverifiedPaid > DEFAULT_TOLERANCE_CENTS,
+    )
     .map<Section>(({ c, ledger }) => ({
       payee: payeeInfo(w, c),
-      balance: ledger.balance,
+      balance: isSettled(ledger.balance) ? 0 : ledger.balance,
+      unverified: ledger.unverifiedPaid,
       open: ledger.charges
-        .filter((x) => x.status !== "paid")
+        .filter((x) => x.status !== "paid" || x.unverified > 0)
         .map((x) => {
           const b = w.billById.get(x.billId);
           return { ...x, title: b?.title ?? "?", shareToken: b?.shareToken ?? null };
@@ -56,7 +62,7 @@ export default async function PersonalPage(props: PageProps<"/p/[token]">) {
       </main>
     );
   }
-  const total = data.sections.reduce((sum, s) => sum + s.balance, 0);
+  const total = data.sections.reduce((sum, s) => sum + Math.max(0, s.balance), 0);
   return (
     <div className="mx-auto min-h-dvh max-w-lg pb-12">
       <Hero className="pt-[max(10px,env(safe-area-inset-top))]">
@@ -78,7 +84,13 @@ export default async function PersonalPage(props: PageProps<"/p/[token]">) {
         data.sections.map((s) => (
           <section key={s.payee.personId} className="mt-8">
             <h2 className="label-mono px-1 text-label-2">
-              欠 {s.payee.name} · <span className="tabular">{formatRM(s.balance)}</span>
+              {s.balance > 0 ? (
+                <>
+                  欠 {s.payee.name} · <span className="tabular">{formatRM(s.balance)}</span>
+                </>
+              ) : (
+                `付给 ${s.payee.name} · 等核对`
+              )}
             </h2>
             <Group className="mt-2.5">
               {s.open.map((c) => (
@@ -91,13 +103,13 @@ export default async function PersonalPage(props: PageProps<"/p/[token]">) {
                   <p className="truncate text-[16px] leading-[21px] font-semibold">{c.title}</p>
                   <p className="mt-0.5 text-[13px] leading-[18px] text-label-2">{formatDate(c.billDate)}</p>
                   <div className="mt-1.5">
-                    <StatusChip status={c.status} remaining={c.remaining} />
+                    <StatusChip status={c.status} remaining={c.remaining} verifying={c.unverified > 0} />
                   </div>
                 </Row>
               ))}
             </Group>
             <div className="mt-3">
-              <PayCard payee={s.payee} amountCents={s.balance} />
+              <PersonPay token={token} payee={s.payee} balance={s.balance} unverified={s.unverified} />
             </div>
           </section>
         ))

@@ -5,7 +5,17 @@ import { HttpError, type SessionUser } from "./auth";
 import { loadWorld } from "./world";
 import { analyzeParsed, loadAliases } from "./incoming";
 import { centsToPlain, formatRM } from "../money";
-import { STATEMENT_TEXT_PREFIX, isIncomingTransfer, parseStatement, sameName, type PdfText, type Statement } from "../tng-statement";
+import { confirmClaims, expireClaims } from "./claims";
+import {
+  STATEMENT_TEXT_PREFIX,
+  isIncomingTransfer,
+  parseStatement,
+  pdfDate,
+  periodRange,
+  sameName,
+  type PdfText,
+  type Statement,
+} from "../tng-statement";
 
 // TNG 交易记录 PDF → 自动记账。跟 TNG 通知用同一套规则（对名字、不超过他欠的才直接记，其他放待确认），
 // 另外用每一笔的交易编号防重复：同一份记录导出几次、日期范围重叠都不会记两次。
@@ -47,10 +57,12 @@ export async function readStatementPdf(bytes: Uint8Array, password: string | und
     });
     pages.push(items);
   }
+  const meta = await pdf.getMetadata().catch(() => null);
   await pdf.cleanup();
   const st = parseStatement(pages);
   if (st.rows.length === 0) throw new HttpError(400, "这个 PDF 看起来不是 TNG 的交易记录（Transaction History）");
-  return st;
+  const info = meta?.info as { CreationDate?: string } | undefined;
+  return { ...st, createdAt: pdfDate(info?.CreationDate) };
 }
 
 export interface StatementSummary {
@@ -68,6 +80,10 @@ export interface StatementSummary {
   self: number;
   beforeStart: number;
   recordedNames: string[];
+  /** 朋友按过「去付款」、这里有这笔钱：核对好 */
+  confirmedNames: string[];
+  /** 朋友按过「去付款」、这里找不到：改回未付 */
+  expiredNames: string[];
 }
 
 export async function ingestStatement(user: SessionUser, st: Statement): Promise<StatementSummary> {
@@ -92,6 +108,8 @@ export async function ingestStatement(user: SessionUser, st: Statement): Promise
       self: 0,
       beforeStart: 0,
       recordedNames: [],
+      confirmedNames: [],
+      expiredNames: [],
     };
     let w = await loadWorld(tx);
     const aliases = await loadAliases(tx);
@@ -127,6 +145,20 @@ export async function ingestStatement(user: SessionUser, st: Statement): Promise
       if (notice) {
         await tx`update incoming_payments set tng_ref = ${r.reference} where id = ${notice.id}`;
         s.linked++;
+        continue;
+      }
+
+      // 他之前按过「去付款」、金额对得上：那一笔核对好
+      const claimId = a.personId ? await confirmClaims(tx, a.personId, user.personId, amount, r.date) : null;
+      if (claimId) {
+        await tx`
+          insert into incoming_payments
+            (user_id, raw_text, sender_name, amount_cents, direction, status, from_person_id, payment_id,
+             verdict, verdict_kind, received_at, resolved_at, tng_ref)
+          values (${user.id}, ${text}, ${r.description}, ${amount}, 'in', 'recorded', ${a.personId}, ${claimId},
+                  '他按了「去付款」，TNG 记录有这笔 ✓', 'claim', ${at}, ${new Date()}, ${r.reference})`;
+        s.confirmedNames.push(`${a.personName ?? r.description} ${formatRM(amount)}`);
+        w = await loadWorld(tx);
         continue;
       }
 
@@ -166,21 +198,34 @@ export async function ingestStatement(user: SessionUser, st: Statement): Promise
                 ${a.personId}, ${paymentId}, ${a.verdict?.message ?? null}, ${a.verdict?.kind ?? null}, ${at},
                 ${status === "pending" ? null : new Date()}, ${r.reference})`;
     }
+
+    // 按了「去付款」、这份记录里却找不到的：改回未付
+    const range = periodRange(st.period);
+    if (range) {
+      const gone = await expireClaims(tx, user, range, st.createdAt ?? null);
+      s.expiredNames = gone.map((g) => `${g.name} ${formatRM(g.amountCents)}`);
+    }
     return s;
   });
 }
 
 /** 记完之后发给你的手机通知 */
 export function summaryNotice(s: StatementSummary): { title: string; body: string; url: string } | null {
-  if (s.recorded === 0 && s.pending === 0) return null;
+  if (s.recorded === 0 && s.pending === 0 && s.confirmedNames.length === 0 && s.expiredNames.length === 0) return null;
+  const list = (names: string[]) => `${names.slice(0, 3).join("、")}${names.length > 3 ? "…" : ""}`;
   const parts: string[] = [];
-  if (s.recorded) parts.push(`记好 ${s.recorded} 笔：${s.recordedNames.slice(0, 3).join("、")}${s.recordedNames.length > 3 ? "…" : ""}`);
+  // 最要紧的放前面：说付了却没付
+  if (s.expiredNames.length) parts.push(`说付了但 TNG 里没有，改回未付：${list(s.expiredNames)}`);
+  if (s.confirmedNames.length) parts.push(`核对好 ${s.confirmedNames.length} 笔：${list(s.confirmedNames)}`);
+  if (s.recorded) parts.push(`记好 ${s.recorded} 笔：${list(s.recordedNames)}`);
   if (s.pending) parts.push(`${s.pending} 笔要你确认`);
   return { title: "TNG 交易记录对好了", body: parts.join("；"), url: "/inbox" };
 }
 
 export function summaryText(s: StatementSummary): string {
   const bits = [`记好 ${s.recorded} 笔`, `待确认 ${s.pending} 笔`];
+  if (s.confirmedNames.length) bits.push(`核对好 ${s.confirmedNames.length} 笔「去付款」`);
+  if (s.expiredNames.length) bits.push(`${s.expiredNames.length} 笔说付了但找不到，改回未付（${s.expiredNames.join("、")}）`);
   if (s.linked) bits.push(`${s.linked} 笔已经记过（接上）`);
   if (s.already) bits.push(`${s.already} 笔之前处理过`);
   if (s.self) bits.push(`${s.self} 笔是你自己转的`);
