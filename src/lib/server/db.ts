@@ -184,6 +184,10 @@ create table if not exists incoming_payments (
   resolved_at timestamptz
 );
 create index if not exists incoming_user_idx on incoming_payments (user_id, received_at desc);
+-- Phase 3：TNG 交易记录 PDF（每一笔的交易编号拿来防重复；第一次只处理最近两天，之前的当作已经自己处理过）
+alter table incoming_payments add column if not exists tng_ref text;
+create unique index if not exists incoming_ref_idx on incoming_payments (user_id, tng_ref);
+alter table users add column if not exists statement_since date;
 
 create table if not exists push_subscriptions (
   id uuid primary key default gen_random_uuid(),

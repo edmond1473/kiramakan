@@ -5,7 +5,7 @@ import { HttpError, getUserById, randomToken, type SessionUser } from "./auth";
 import { ledgerBetween, loadWorld, type World } from "./world";
 import { classifyPayment, DEFAULT_TOLERANCE_CENTS, type PaymentVerdict } from "../ledger";
 import { formatRM } from "../money";
-import { matchSender, normalizeName, parseTngNotice, type Direction, type MatchCandidate } from "../tng-notify";
+import { matchSender, normalizeName, parseTngNotice, type Direction, type MatchCandidate, type ParsedNotice } from "../tng-notify";
 import { pendingText, recordedText, type NoticeText, type PendingReason } from "../remind";
 
 // TNG 进账通知 → 自动记账。
@@ -66,7 +66,7 @@ export async function rotateWebhookKey(userId: string): Promise<string> {
 
 // ---------- 认人 ----------
 
-async function loadAliases(q?: postgres.Sql | postgres.TransactionSql): Promise<Map<string, string[]>> {
+export async function loadAliases(q?: postgres.Sql | postgres.TransactionSql): Promise<Map<string, string[]>> {
   const sql = q ?? (await db());
   const rows = await sql<{ alias: string; person_id: string }[]>`select alias, person_id from tng_aliases`;
   const m = new Map<string, string[]>();
@@ -96,7 +96,11 @@ export function candidatesFor(w: World, me: { personId: string }, aliases: Map<s
 
 /** 看一个通知会怎么处理（不写资料库；「试一试」也用这个） */
 export function analyze(w: World, me: { personId: string }, aliases: Map<string, string[]>, text: string): Analysis {
-  const parsed = parseTngNotice(text);
+  return analyzeParsed(w, me, aliases, parseTngNotice(text));
+}
+
+/** 已经知道金额、谁转的、方向（通知解析出来的，或 TNG 交易记录 PDF 的一行）：要直接记、放待确认、还是不管 */
+export function analyzeParsed(w: World, me: { personId: string }, aliases: Map<string, string[]>, parsed: ParsedNotice): Analysis {
   const base: Analysis = {
     ...parsed,
     outcome: "ignore",

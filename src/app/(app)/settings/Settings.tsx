@@ -194,11 +194,6 @@ export function Settings({
           </Row>
         </Group>
 
-        <Group title="快要来">
-          <div className="p-5 text-[14px] leading-[21px] text-label-2">
-            每星期上传 TNG 交易记录 PDF，补回 iPhone 没传到的进账。
-          </div>
-        </Group>
         <div className="h-6" />
       </div>
 

@@ -25,6 +25,10 @@ export function TngGroup({ lastNoticeAt, pending }: { lastNoticeAt: string | nul
             {lastNoticeAt ? `最近收到通知：${formatWhen(lastNoticeAt)}` : "还没收到过通知"}
           </p>
         </Row>
+        <Row href="/settings/tng-statement" chevron>
+          <p className="text-[16px] leading-[21px]">TNG 交易记录对账</p>
+          <p className="mt-0.5 text-[13px] leading-[18px] text-label-2">每晚导出 PDF 寄到 Gmail，自动补回漏掉的进账</p>
+        </Row>
         <Row href="/inbox" chevron trailing={pending > 0 ? <Tag tone="flare">{pending} 笔要确认</Tag> : undefined}>
           <span className="text-[16px]">TNG 进账记录</span>
         </Row>
