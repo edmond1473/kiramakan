@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BellOff, Undo2 } from "lucide-react";
+import { Undo2 } from "lucide-react";
 import { api } from "@/lib/client/api";
 import { formatRM } from "@/lib/money";
 import type { PendingReason } from "@/lib/remind";
+import { isStatementText as fromStatement } from "@/lib/tng-statement";
 import { Avatar, BigMoney, Button, Empty, Group, LinkButton, Money, PageHeader, Row, Tag, cx, formatWhen } from "@/components/ui";
 import { Sheet, toast } from "@/components/ui-client";
 
@@ -41,6 +42,8 @@ export interface RecordedV {
   receivedAt: string;
   /** true = 自动记的；false = 你按了确认 */
   auto: boolean;
+  /** TNG 交易记录 PDF 来的（只有日期） */
+  fromStatement: boolean;
 }
 
 export interface OtherV {
@@ -53,6 +56,9 @@ export interface OtherV {
 }
 
 type Pick = { id: string; amountCents: number | null; senderName: string | null };
+
+/** 旧的记录说明里有交易编号，不用给人看 */
+const cleanText = (rawText: string) => rawText.replace(/（[^（）]*编号[^（）]*）/g, "");
 
 export function Inbox({
   pending,
@@ -100,7 +106,7 @@ export function Inbox({
       <PageHeader
         title="TNG 进账"
         back={{ href: "/", label: "账本" }}
-        subtitle="朋友转钱给你时 iPhone 收到的 TNG 通知。对得上的自动记好；对不上的在这里按一下。"
+        subtitle="朋友用 TNG 转钱给你的记录（iPhone 的 TNG 通知、TNG 交易记录 PDF）。对得上的自动记好；对不上的在这里按一下。"
       />
       <div className="px-4">
         {nothing && (
@@ -151,7 +157,7 @@ export function Inbox({
                   {r.personName} <Money cents={r.amountCents} />
                 </p>
                 <p className="mt-0.5 text-[13px] leading-[18px] text-label-2">
-                  {formatWhen(r.receivedAt)} · {r.auto ? "自动记录" : "你确认的"}
+                  {formatWhen(r.receivedAt, r.fromStatement)} · {r.auto ? "自动记录" : "你确认的"}
                 </p>
                 {r.verdict && (
                   <div className="mt-1.5">
@@ -187,9 +193,9 @@ export function Inbox({
                     ) : undefined
                   }
                 >
-                  <p className="line-clamp-2 text-[14px] leading-5 break-words">{o.rawText}</p>
+                  <p className="line-clamp-2 text-[14px] leading-5 break-words">{cleanText(o.rawText)}</p>
                   <p className="mt-1 text-[12px] leading-4 text-label-2">
-                    {formatWhen(o.receivedAt)} · {otherLabel(o)}
+                    {formatWhen(o.receivedAt, fromStatement(o.rawText))} · {otherLabel(o)}
                   </p>
                 </Row>
               ))}
@@ -236,11 +242,13 @@ function PendingCard({
 }) {
   const amount = p.amountCents ?? 0;
   const who = p.person;
+  // 「多给了」但其实一毛都没欠：当作没欠钱（不然会出现「只记 RM 0.00」）
+  const reason = who && p.reason === "overpay" && who.owed <= 0 ? "no_debt" : p.reason;
   let headline: string;
-  if (who && p.reason === "overpay") headline = `${who.name} 转了 ${formatRM(amount)}，但他只欠你 ${formatRM(who.owed)}。`;
-  else if (who && p.reason === "no_debt") headline = `${who.name} 转了 ${formatRM(amount)}，但他目前没有欠你钱。`;
-  else if (who && p.reason === "unsure") headline = `看起来是 ${who.name} 转来的，对吗？`;
-  else if (p.reason === "undone") headline = "撤销了。是哪个朋友转的？";
+  if (who && reason === "overpay") headline = `${who.name} 转了 ${formatRM(amount)}，但他只欠你 ${formatRM(who.owed)}。`;
+  else if (who && reason === "no_debt") headline = `${who.name} 转了 ${formatRM(amount)}，但他目前没有欠你钱。`;
+  else if (who && reason === "unsure") headline = `看起来是 ${who.name} 转来的，对吗？`;
+  else if (reason === "undone") headline = "撤销了。是哪个朋友转的？";
   else if (p.senderName) headline = `TNG 显示「${p.senderName}」，是哪个朋友？`;
   else headline = "看不到是谁转的，是哪个朋友？";
 
@@ -251,12 +259,12 @@ function PendingCard({
     <article className="card rounded-[24px] bg-surface p-5">
       <div className="flex items-start justify-between gap-3">
         <BigMoney cents={amount} className="text-[36px] leading-none" />
-        <span className="label-mono pt-1 text-label-2">{formatWhen(p.receivedAt)}</span>
+        <span className="label-mono pt-1 text-label-2">{formatWhen(p.receivedAt, fromStatement(p.rawText))}</span>
       </div>
       <p className="mt-3 text-[16px] leading-[22px] font-semibold">{headline}</p>
-      <p className="mt-1.5 line-clamp-3 text-[13px] leading-[18px] break-words text-label-2">「{p.rawText}」</p>
+      <p className="mt-1.5 line-clamp-3 text-[13px] leading-[18px] break-words text-label-2">「{cleanText(p.rawText)}」</p>
 
-      {who && p.reason === "overpay" ? (
+      {who && reason === "overpay" ? (
         <div className="mt-4 grid gap-2">
           <Button variant="filled" full loading={isBusy(assignKey(who.id, who.owed))} onClick={() => onAssign(p.id, who.id, who.owed)}>
             只记 {formatRM(who.owed)}（刚好还清）
@@ -265,7 +273,7 @@ function PendingCard({
             全部记 {formatRM(amount)}（多的下次扣）
           </Button>
         </div>
-      ) : who && p.reason === "no_debt" ? (
+      ) : who && reason === "no_debt" ? (
         <div className="mt-4 grid gap-2">
           <Button variant="tinted" full loading={isBusy(`ignore:${p.id}`)} onClick={() => onIgnore(p.id)}>
             不是还钱，不记
@@ -274,7 +282,7 @@ function PendingCard({
             记成 credit（下次自动扣）
           </Button>
         </div>
-      ) : who && p.reason === "unsure" ? (
+      ) : who && reason === "unsure" ? (
         <div className="mt-4 grid gap-2">
           <Button variant="filled" full loading={isBusy(assignKey(who.id))} onClick={() => onAssign(p.id, who.id)}>
             对，是 {who.name} 还钱
@@ -305,13 +313,13 @@ function PendingCard({
         </div>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <Button variant="plain" size="sm" onClick={onPick} disabled={!!busy}>
+      <div className={cx("mt-3 grid gap-2", who && reason === "no_debt" ? "grid-cols-1" : "grid-cols-2")}>
+        <Button full onClick={onPick} disabled={!!busy}>
           {who || p.suggestions.length > 0 ? "其实是别人" : "选是谁"}
         </Button>
-        {!(who && p.reason === "no_debt") && (
-          <Button variant="plain" size="sm" loading={isBusy(`ignore:${p.id}`)} onClick={() => onIgnore(p.id)}>
-            <BellOff className="size-3.5" strokeWidth={2.25} aria-hidden /> 不是还钱，不记
+        {!(who && reason === "no_debt") && (
+          <Button full loading={isBusy(`ignore:${p.id}`)} onClick={() => onIgnore(p.id)}>
+            不是还钱，不记
           </Button>
         )}
       </div>

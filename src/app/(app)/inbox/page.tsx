@@ -4,6 +4,7 @@ import { ledgerBetween, loadWorld } from "@/lib/server/world";
 import { listIncoming } from "@/lib/server/incoming";
 import { classifyPayment, DEFAULT_TOLERANCE_CENTS } from "@/lib/ledger";
 import { matchSender } from "@/lib/tng-notify";
+import { isStatementText } from "@/lib/tng-statement";
 import { Inbox, type OtherV, type PendingV, type PersonOpt, type RecordedV } from "./Inbox";
 
 export const metadata: Metadata = { title: "TNG 进账" };
@@ -83,6 +84,7 @@ export default async function InboxPage() {
         verdictKind: r.verdictKind,
         receivedAt: r.receivedAt,
         auto: !r.reason,
+        fromStatement: isStatementText(r.rawText),
       });
     } else {
       others.push({

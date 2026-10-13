@@ -110,6 +110,10 @@ function rm(s: string): number | null {
   return m[1] || m[2] ? -cents : cents;
 }
 
+/** 进账说明的开头：看到这个就知道是 PDF 来的（只有日期、没有时间） */
+export const STATEMENT_TEXT_PREFIX = "TNG 交易记录";
+export const isStatementText = (rawText: string) => rawText.startsWith(STATEMENT_TEXT_PREFIX);
+
 /** 别人转进来的钱：TNG 转账（Receive from Wallet）、银行 DuitNow 转进来（DUITNOW_RECEIVEFROM） */
 export function isIncomingTransfer(r: StatementRow): boolean {
   return /^success$/i.test(r.status) && /receive/i.test(r.type.replace(/\s+/g, "")) && !!r.amountCents && r.amountCents > 0;

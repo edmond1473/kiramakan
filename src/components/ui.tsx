@@ -361,14 +361,15 @@ export function daysSince(isoDate: string): number {
 }
 
 /** 什么时候（马来西亚时间）：「今天 9:41 PM」「昨天 8:02 AM」「3 Oct 7:15 PM」 */
-export function formatWhen(iso: string): string {
+/** dateOnly：只知道日期、不知道几点的（例如 TNG 交易记录 PDF） */
+export function formatWhen(iso: string, dateOnly = false): string {
   const d = new Date(iso);
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur" }).format(d);
-  const time = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kuala_Lumpur", hour: "numeric", minute: "2-digit" }).format(d);
+  const time = dateOnly ? "" : ` ${new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kuala_Lumpur", hour: "numeric", minute: "2-digit" }).format(d)}`;
   const ago = daysSince(day);
-  if (ago === 0) return `今天 ${time}`;
-  if (ago === 1) return `昨天 ${time}`;
-  return `${formatDateShort(day)} ${time}`;
+  if (ago === 0) return `今天${time}`;
+  if (ago === 1) return `昨天${time}`;
+  return `${formatDateShort(day)}${time}`;
 }
 
 /** iOS 风格的开关（只是样子，按的是外面那一行） */

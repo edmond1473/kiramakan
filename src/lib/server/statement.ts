@@ -5,7 +5,7 @@ import { HttpError, type SessionUser } from "./auth";
 import { loadWorld } from "./world";
 import { analyzeParsed, loadAliases } from "./incoming";
 import { centsToPlain, formatRM } from "../money";
-import { isIncomingTransfer, parseStatement, sameName, type PdfText, type Statement } from "../tng-statement";
+import { STATEMENT_TEXT_PREFIX, isIncomingTransfer, parseStatement, sameName, type PdfText, type Statement } from "../tng-statement";
 
 // TNG 交易记录 PDF → 自动记账。跟 TNG 通知用同一套规则（对名字、不超过他欠的才直接记，其他放待确认），
 // 另外用每一笔的交易编号防重复：同一份记录导出几次、日期范围重叠都不会记两次。
@@ -113,7 +113,8 @@ export async function ingestStatement(user: SessionUser, st: Statement): Promise
         continue;
       }
       const at = `${r.date}T12:00:00+08:00`; // PDF 只有日期
-      const text = `TNG 交易记录 ${r.date}：${r.description} 转给你 RM ${centsToPlain(amount)}（${r.type}，编号 ${r.reference}）`;
+      // 交易编号存在 tng_ref，说明里不用写
+      const text = `${STATEMENT_TEXT_PREFIX} ${r.date}：${r.description} 转给你 RM ${centsToPlain(amount)}`;
       const a = analyzeParsed(w, user, aliases, { text, amountCents: amount, sender: r.description, direction: "in" });
 
       // TNG 通知已经收过这一笔（通知没有交易编号）：补上编号就好
